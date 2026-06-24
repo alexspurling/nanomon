@@ -25,9 +25,6 @@ class ExampleApplication : public Screen {
 public:
     ExampleApplication() : Screen(Vector2i(1024, 768), "NanoGUI Test") {
         inc_ref();
-        // Window *window = new Window(this, "Button demo");
-        // window->set_position(Vector2i(15, 15));
-        // window->set_layout(new GroupLayout());
 
         this->set_layout(new GroupLayout());
 
@@ -51,7 +48,6 @@ public:
             new Label(content, "Push button", "sans-bold");
         }
 
-        //
         perform_layout();
 
         /* All NanoGUI widgets are initialized at this point. Now

@@ -46,8 +46,8 @@ endfunction()
 
 add_executable(nanomon src/main.cpp)
 
-embed_shader(nanomon shaders/simple_vert.vert simple_vert)
-embed_shader(nanomon shaders/simple_frag.frag simple_frag)
+embed_shader(nanomon shaders/simple_vert.glsl simple_vert)
+embed_shader(nanomon shaders/simple_frag.glsl simple_frag)
 
 # Link against nanogui (this also pulls in GLFW, OpenGL, etc.)
 target_link_libraries(nanomon PRIVATE nanogui ${NANOGUI_EXTRA_LIBS})
