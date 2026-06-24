@@ -1,38 +1,10 @@
-/*
-    src/example1.cpp -- C++ version of an example application that shows
-    how to use the various widget classes. For a Python implementation, see
-    '../python/example1.py'.
-
-    NanoGUI was developed by Wenzel Jakob <wenzel.jakob@epfl.ch>.
-    The widget drawing code is based on the NanoVG demo application
-    by Mikko Mononen.
-
-    All rights reserved. Use of this source code is governed by a
-    BSD-style license that can be found in the LICENSE.txt file.
-*/
-
 #include <nanogui/opengl.h>
 #include <nanogui/screen.h>
 #include <nanogui/window.h>
 #include <nanogui/layout.h>
 #include <nanogui/label.h>
-#include <nanogui/checkbox.h>
 #include <nanogui/button.h>
-#include <nanogui/toolbutton.h>
-#include <nanogui/popupbutton.h>
-#include <nanogui/combobox.h>
-#include <nanogui/progressbar.h>
-#include <nanogui/icons.h>
-#include <nanogui/messagedialog.h>
-#include <nanogui/textbox.h>
-#include <nanogui/slider.h>
-#include <nanogui/imagepanel.h>
-#include <nanogui/imageview.h>
 #include <nanogui/vscrollpanel.h>
-#include <nanogui/colorwheel.h>
-#include <nanogui/colorpicker.h>
-#include <nanogui/graph.h>
-#include <nanogui/tabwidget.h>
 #include <nanogui/texture.h>
 #include <nanogui/shader.h>
 #include <nanogui/renderpass.h>
@@ -41,30 +13,13 @@
 
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
-#if defined(_MSC_VER)
-#  pragma warning (disable: 4505) // don't warn about dead code in stb_image.h
-#elif defined(__GNUC__)
-#  pragma GCC diagnostic ignored "-Wunused-function"
-#endif
 
 #include <stb_image.h>
-
-using namespace nanogui;
-
-#include <fstream>
-#include <sstream>
 
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
 
-static std::string load_shader(const std::string &path) {
-    std::ifstream file(path);
-    if (!file.is_open())
-        throw std::runtime_error("Could not open shader file: " + path);
-    std::ostringstream ss;
-    ss << file.rdbuf();
-    return ss.str();
-}
+using namespace nanogui;
 
 class ExampleApplication : public Screen {
 public:
@@ -172,13 +127,8 @@ public:
         }
     }
 private:
-    ProgressBar *m_progress;
     ref<Shader> m_shader;
     ref<RenderPass> m_render_pass;
-
-    using ImageHolder = std::unique_ptr<uint8_t[], void(*)(void*)>;
-    std::vector<std::pair<ref<Texture>, ImageHolder>> m_images;
-    int m_current_image;
 };
 
 int main(int /* argc */, char ** /* argv */) {
@@ -195,11 +145,7 @@ int main(int /* argc */, char ** /* argv */) {
         nanogui::shutdown();
     } catch (const std::exception &e) {
         std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
-        #if defined(_WIN32)
-            MessageBoxA(nullptr, error_msg.c_str(), NULL, MB_ICONERROR | MB_OK);
-        #else
-            std::cerr << error_msg << std::endl;
-        #endif
+        std::cerr << error_msg << std::endl;
         return -1;
     } catch (...) {
         std::cerr << "Caught an unknown error!" << std::endl;
