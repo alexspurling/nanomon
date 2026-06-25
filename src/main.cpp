@@ -51,9 +51,9 @@ public:
         b->set_flags(Button::RadioButton);
 
         Widget *cpu_graph_container = new Widget(this);
-        cpu_graph_container->set_fixed_size({250, 250});
+        cpu_graph_container->set_fixed_height(250);
         CpuGraph *cpu_graph = new CpuGraph(cpu_graph_container);
-        cpu_graph->set_fixed_size({250, 250});
+        // cpu_graph->set_fixed_size({250, 250});
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
@@ -104,7 +104,13 @@ public:
         m_shader->set_uniform("intensity", .5f);
     }
 
-    virtual bool keyboard_event(int key, int scancode, int action, int modifiers) {
+    // Enable components to be resized
+    bool resize_event(const Vector2i &size) override {
+        perform_layout();
+        return Screen::resize_event(size);
+    }
+
+    bool keyboard_event(int key, int scancode, int action, int modifiers) override {
         if (Screen::keyboard_event(key, scancode, action, modifiers))
             return true;
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -114,12 +120,12 @@ public:
         return false;
     }
 
-    virtual void draw(NVGcontext *ctx) {
+    void draw(NVGcontext *ctx) override {
         /* Draw the user interface */
         Screen::draw(ctx);
     }
 
-    virtual void draw_contents() {
+    void draw_contents() override {
         Matrix4f mvp = Matrix4f::scale(Vector3f(
                            (float) m_size.y() / (float) m_size.x() * 0.25f, 0.25f, 0.25f)) *
                        Matrix4f::rotate(Vector3f(0, 0, 1), (float) glfwGetTime());

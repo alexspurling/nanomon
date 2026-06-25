@@ -13,6 +13,7 @@ class CpuGraph : public Canvas {
 public:
     CpuGraph(Widget *parent);
 
+    void perform_layout(NVGcontext *ctx) override;
     void draw_contents() override;
 
 private:

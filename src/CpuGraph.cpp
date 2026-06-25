@@ -67,6 +67,15 @@ CpuGraph::CpuGraph(Widget *parent)
     m_shader->set_buffer("color", VariableType::Float32, {8, 3}, colors);
 }
 
+void CpuGraph::perform_layout(NVGcontext *ctx) {
+    if (parent()) {
+        set_position({0, 0});
+        set_size(parent()->size());
+        std::cout << "set to parent size: " << parent()->size() << std::endl;
+    }
+    Widget::perform_layout(ctx);
+}
+
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
@@ -85,7 +94,7 @@ void CpuGraph::draw_contents() {
         float(25 * Pi / 180),
         0.1f,
         20.f,
-        1
+        static_cast<float>(m_size.x()) / static_cast<float>(m_size.y())
     );
 
     Matrix4f mvp = proj * view * model;
