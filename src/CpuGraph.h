@@ -3,23 +3,20 @@
 
 #pragma once
 
+#include <nanogui/canvas.h>
+#include <nanogui/shader.h>
 #include <nanogui/widget.h>
 
-class CpuGraph : public nanogui::Widget {
+using namespace nanogui;
+
+class CpuGraph : public Canvas {
 public:
-    CpuGraph(nanogui::Widget *parent, const nanogui::Color &bg);
+    CpuGraph(Widget *parent);
 
-    /// Sets the background color
-    void set_background_color(const nanogui::Color &background_color);
-
-    void perform_layout(NVGcontext *ctx) override;
-    void draw(NVGcontext *ctx) override;
-
-protected:
-    nanogui::Vector2i preferred_size_impl(NVGcontext *ctx) const override;
+    void draw_contents() override;
 
 private:
-    nanogui::Color m_background_color;
+    ref<Shader> m_shader;
 };
 
 #endif //NANOMON_CPUGRAPH_H

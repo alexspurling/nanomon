@@ -50,11 +50,10 @@ public:
         b->set_callback([] { std::cout << "Disk pushed!" << std::endl; });
         b->set_flags(Button::RadioButton);
 
-        b->set_background_color(Color(255, 0, 0, 25));
-
         Widget *cpu_graph_container = new Widget(this);
-        cpu_graph_container->set_fixed_height(200);
-        new CpuGraph(cpu_graph_container, Color(120, 10, 40, 255));
+        cpu_graph_container->set_fixed_size({250, 250});
+        CpuGraph *cpu_graph = new CpuGraph(cpu_graph_container);
+        cpu_graph->set_fixed_size({250, 250});
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
