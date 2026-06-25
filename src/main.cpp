@@ -16,6 +16,7 @@
 
 #include <stb_image.h>
 
+#include "CpuGraph.h"
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
 
@@ -30,11 +31,30 @@ public:
 
         /* No need to store a pointer, the data structure will be automatically
            freed when the parent window is deleted */
-        new Label(this, "Push buttons", "sans-bold");
+        // new Label(this, "Push buttons", "sans-bold");
 
-        Button *b = new Button(this, "Plain button");
-        b->set_callback([] { std::cout << "pushed!" << std::endl; });
-        b->set_tooltip("short tooltip");
+        Widget *tab_group = new Widget(this);
+        tab_group->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+
+        Button *b = new Button(tab_group, "CPU");
+        b->set_flags(Button::RadioButton);
+        b->set_pushed(true);
+        b->set_callback([] { std::cout << "CPU pushed!" << std::endl; });
+        b = new Button(tab_group, "Memory");
+        b->set_callback([] { std::cout << "Memory pushed!" << std::endl; });
+        b->set_flags(Button::RadioButton);
+        b = new Button(tab_group, "GPU");
+        b->set_callback([] { std::cout << "GPU pushed!" << std::endl; });
+        b->set_flags(Button::RadioButton);
+        b = new Button(tab_group, "Disk");
+        b->set_callback([] { std::cout << "Disk pushed!" << std::endl; });
+        b->set_flags(Button::RadioButton);
+
+        b->set_background_color(Color(255, 0, 0, 25));
+
+        Widget *cpu_graph_container = new Widget(this);
+        cpu_graph_container->set_fixed_height(200);
+        new CpuGraph(cpu_graph_container, Color(120, 10, 40, 255));
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);

@@ -44,7 +44,8 @@ function(embed_shader TARGET SHADER_FILE)
     target_include_directories(${TARGET} PRIVATE ${CMAKE_BINARY_DIR}/generated)
 endfunction()
 
-add_executable(nanomon src/main.cpp)
+add_executable(nanomon src/main.cpp
+        src/CpuGraph.cpp)
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)
 embed_shader(nanomon shaders/simple_frag.glsl simple_frag)
