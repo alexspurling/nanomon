@@ -14,8 +14,6 @@ using nanogui::Shader;
 
 constexpr float Pi = 3.14159f;
 
-constexpr size_t MAX_POINTS = 1000; // or whatever your max history length is
-
 CpuGraph::CpuGraph(Widget *parent)
     : Canvas(parent, 1) {
 
@@ -84,27 +82,28 @@ void CpuGraph::draw_contents() {
             std::cout << "Core 0 usage: " << core_usage << std::endl;
         }
         float y = 2 * core_usage - 1.0f;
+
+        // Append new y value (placeholder x, will recompute below)
+        m_graph_data[i].push_back(0.0f); // x placeholder
         m_graph_data[i].push_back(y);
+
+        // Recompute x values based on the new total point count
+        size_t n = m_graph_data[i].size() / 2;
+        for (size_t j = 0; j < n; j++) {
+            float x = -1.0f + 2.0f * (float(j) / std::max(float(n - 1), 1.0f));
+            m_graph_data[i][j * 2] = x;
+        }
     }
     // TODO remove data from m_graph_data when we've reached the max number of samples
 
     for (int i = 0; i < latest_sample.samples.size(); i++) {
-        std::vector<float> data = m_graph_data[i];
-        int num_points = static_cast<int>(data.size());
+        size_t num_points = m_graph_data[i].size() / 2;
         if (num_points < 2) continue;
 
-        std::vector<float> padded(MAX_POINTS * 2, 0.0f);
-        for (int j = 0; j < num_points; j++) {
-            padded[j * 2 + 0] = -1.0f + 2.0f * (float(j) / std::max(float(num_points - 1), 1.0f)); // x
-            padded[j * 2 + 1] = data[j]; // y
-        }
-        m_shader->set_buffer("points", VariableType::Float32, { MAX_POINTS, 2 }, padded.data());
+        m_shader->set_buffer("points", VariableType::Float32, { num_points, 2 }, m_graph_data[i].data());
 
-        // m_shader->begin() FAILS WITH THE ERROR:
-        // Shader::begin(): shader "cpu_graph_shader" has an unbound argument "gl_VertexID"!
-        // Caught exception in main loop: "cpu_graph_shader": vertex attribute "points" has an invalid dimension (expected ndim=2, got 1)
         m_shader->begin();
-        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
+        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, static_cast<int>(num_points), false);
         m_shader->end();
     }
 }
