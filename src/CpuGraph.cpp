@@ -14,6 +14,9 @@ using nanogui::Shader;
 
 constexpr float Pi = 3.14159f;
 
+// Maximum number of points to keep in the graph (oldest points are trimmed)
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 300;
+
 // Colour palette for each core
 static const Vector3f core_colours[] = {
     {0.0f, 1.0f, 0.0f},  // green
@@ -101,14 +104,20 @@ void CpuGraph::draw_contents() {
         m_graph_data[i].push_back(0.0f); // x placeholder
         m_graph_data[i].push_back(y);
 
-        // Recompute x values based on the new total point count
+        // Recompute x values with a fixed step, aligned to the right side (x = 1)
         size_t n = m_graph_data[i].size() / 2;
+        float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 1);
         for (size_t j = 0; j < n; j++) {
-            float x = -1.0f + 2.0f * (float(j) / std::max(float(n - 1), 1.0f));
+            float x = 1.0f - static_cast<float>(n - 1 - j) * dx;
             m_graph_data[i][j * 2] = x;
         }
+
+        // Trim oldest points if we exceed the maximum
+        if (n > GRAPH_DATA_MAX_POINTS) {
+            size_t excess = n - GRAPH_DATA_MAX_POINTS;
+            m_graph_data[i].erase(m_graph_data[i].begin(), m_graph_data[i].begin() + static_cast<long>(excess * 2));
+        }
     }
-    // TODO remove data from m_graph_data when we've reached the max number of samples
 
     for (int i = 0; i < latest_sample.samples.size(); i++) {
         size_t num_points = m_graph_data[i].size() / 2;
