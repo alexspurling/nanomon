@@ -10,6 +10,7 @@
 #include <nanogui/renderpass.h>
 #include <iostream>
 #include <memory>
+#include <sstream>
 
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
@@ -53,7 +54,14 @@ public:
         Widget *cpu_graph_container = new Widget(this);
         cpu_graph_container->set_fixed_height(250);
         CpuGraph *cpu_graph = new CpuGraph(cpu_graph_container);
-        // cpu_graph->set_fixed_size({250, 250});
+
+        m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
+
+        cpu_graph->set_mouse_over_callback([this](float x, float y) {
+            std::ostringstream oss;
+            oss << "Graph mouse coords: (" << x << ", " << y << ")";
+            m_coord_label->set_caption(oss.str());
+        });
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
@@ -64,7 +72,7 @@ public:
         //
 
         for (int i = 0; i < 10; ++i) {
-            new Label(content, "Push button", "sans-bold");
+            new Label(content, "Label " + std::to_string(i), "sans-bold");
         }
 
         perform_layout();
@@ -148,6 +156,7 @@ public:
         }
     }
 private:
+    Label *m_coord_label;
     ref<Shader> m_shader;
     ref<RenderPass> m_render_pass;
 };

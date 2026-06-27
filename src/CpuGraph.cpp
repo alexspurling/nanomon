@@ -68,6 +68,15 @@ void CpuGraph::perform_layout(NVGcontext *ctx) {
     Widget::perform_layout(ctx);
 }
 
+bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
+    if (m_mouse_over_callback) {
+        float x = 2.0f * p.x() / static_cast<float>(m_size.x()) - 1.0f;
+        float y = 1.0f - 2.0f * p.y() / static_cast<float>(m_size.y());
+        m_mouse_over_callback(x, y);
+    }
+    return Canvas::mouse_motion_event(p, rel, button, modifiers);
+}
+
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
