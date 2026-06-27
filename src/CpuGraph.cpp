@@ -145,7 +145,8 @@ void CpuGraph::draw_contents() {
         now - m_last_sample_time).count();
     float scroll_progress = std::min(
         static_cast<float>(elapsed_ms) / static_cast<float>(update_interval_ms), 1.0f);
-    float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 1);
+    // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
+    float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
     float scroll_offset = scroll_progress * dx;
 
     // Update x-values for all cores every frame (smooth scrolling)
@@ -154,7 +155,8 @@ void CpuGraph::draw_contents() {
         if (n < 2) continue;
 
         for (size_t j = 0; j < n; j++) {
-            float x = 1.0f - static_cast<float>(n - 1 - j) * dx - scroll_offset;
+            // By adding dx here we will draw the last point off the screen at x=1 which ensures smooth animation
+            float x = 1.0f + dx - static_cast<float>(n - 1 - j) * dx - scroll_offset;
             m_graph_data[i][j * 2] = x;
         }
     }
