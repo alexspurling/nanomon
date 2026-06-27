@@ -15,7 +15,10 @@ using nanogui::Shader;
 constexpr float Pi = 3.14159f;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 300;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 100;
+
+// Update interval — how often to sample CPU data (milliseconds)
+static constexpr long long update_interval_ms = 100;
 
 // Colour palette for each core
 static const Vector3f core_colours[] = {
@@ -69,57 +72,95 @@ void CpuGraph::draw_contents() {
     using namespace nanogui;
 
     Timestamp now = std::chrono::system_clock::now();
-    CpuSample latest_sample = m_cpu_history.sample(now);
 
-    int num_samples = m_cpu_history.num_samples();
-    std::cout << "Num samples: " << num_samples << std::endl;
+    // Decide whether to take a new CPU sample this frame
+    bool should_sample = false;
+    if (!m_has_sampled) {
+        m_last_sample_time = now;
+        m_has_sampled = true;
+        should_sample = true;
+    } else {
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - m_last_sample_time).count();
+        if (elapsed >= update_interval_ms) {
+            should_sample = true;
+            m_last_sample_time = now;
+        }
+    }
 
-    if (num_samples < 2) {
-        // Need to wait until we have at least 2 samples
+    // Sample CPU data once per update interval
+    if (should_sample) {
+        m_cpu_history.sample(now);
+
+        int num_samples = m_cpu_history.num_samples();
+        std::cout << "Num samples: " << num_samples << std::endl;
+
+        if (num_samples >= 2) {
+            CpuSample latest_sample = m_cpu_history.get_latest_sample();
+            CpuSample prev_sample = m_cpu_history.prev_sample();
+
+            // Resize graph data to match number of cores (if not already sized)
+            if (m_graph_data.size() != latest_sample.samples.size()) {
+                m_graph_data.resize(latest_sample.samples.size());
+            }
+
+            for (int i = 0; i < static_cast<int>(latest_sample.samples.size()); i++) {
+                unsigned long cpu_total_diff = latest_sample.samples[i].total_time -
+                    prev_sample.samples[i].total_time;
+                unsigned long cpu_idle_diff = latest_sample.samples[i].idle_time -
+                    prev_sample.samples[i].idle_time;
+
+                float core_usage = 0.0f;
+                if (cpu_total_diff > 0) {
+                    core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) /
+                        static_cast<float>(cpu_total_diff);
+                }
+                if (i == 0) {
+                    std::cout << "Core 0 usage: " << core_usage << std::endl;
+                }
+                float y = 2 * core_usage - 1.0f;
+
+                // Append new point (x placeholder, y value)
+                m_graph_data[i].push_back(0.0f);
+                m_graph_data[i].push_back(y);
+
+                // Trim oldest points if we exceed the maximum
+                size_t n = m_graph_data[i].size() / 2;
+                if (n > GRAPH_DATA_MAX_POINTS) {
+                    size_t excess = n - GRAPH_DATA_MAX_POINTS;
+                    m_graph_data[i].erase(m_graph_data[i].begin(),
+                                          m_graph_data[i].begin() + static_cast<long>(excess * 2));
+                }
+            }
+        }
+    }
+
+    if (m_cpu_history.num_samples() < 2) {
+        // Need at least 2 samples to render anything
         return;
     }
 
-    CpuSample prev_sample = m_cpu_history.prev_sample();
+    // Compute smooth scroll offset based on time since last sample
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - m_last_sample_time).count();
+    float scroll_progress = std::min(
+        static_cast<float>(elapsed_ms) / static_cast<float>(update_interval_ms), 1.0f);
+    float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 1);
+    float scroll_offset = scroll_progress * dx;
 
-    // Resize graph data to match number of cores (if not already sized)
-    if (m_graph_data.size() != latest_sample.samples.size()) {
-        m_graph_data.resize(latest_sample.samples.size());
-    }
-
-    // TODO ignore sample time for now
-    for (int i = 0; i < latest_sample.samples.size(); i++) {
-        unsigned long cpu_total_diff = latest_sample.samples[i].total_time - prev_sample.samples[i].total_time;
-        unsigned long cpu_idle_diff = latest_sample.samples[i].idle_time - prev_sample.samples[i].idle_time;
-
-        float core_usage = 0.0f;
-        if (cpu_total_diff > 0) {
-            core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) / cpu_total_diff;
-        }
-        if (i == 0) {
-            std::cout << "Core 0 usage: " << core_usage << std::endl;
-        }
-        float y = 2 * core_usage - 1.0f;
-
-        // Append new y value (placeholder x, will recompute below)
-        m_graph_data[i].push_back(0.0f); // x placeholder
-        m_graph_data[i].push_back(y);
-
-        // Recompute x values with a fixed step, aligned to the right side (x = 1)
+    // Update x-values for all cores every frame (smooth scrolling)
+    for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
         size_t n = m_graph_data[i].size() / 2;
-        float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 1);
+        if (n < 2) continue;
+
         for (size_t j = 0; j < n; j++) {
-            float x = 1.0f - static_cast<float>(n - 1 - j) * dx;
+            float x = 1.0f - static_cast<float>(n - 1 - j) * dx - scroll_offset;
             m_graph_data[i][j * 2] = x;
         }
-
-        // Trim oldest points if we exceed the maximum
-        if (n > GRAPH_DATA_MAX_POINTS) {
-            size_t excess = n - GRAPH_DATA_MAX_POINTS;
-            m_graph_data[i].erase(m_graph_data[i].begin(), m_graph_data[i].begin() + static_cast<long>(excess * 2));
-        }
     }
 
-    for (int i = 0; i < latest_sample.samples.size(); i++) {
+    // Render each core's line strip
+    for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
         size_t num_points = m_graph_data[i].size() / 2;
         if (num_points < 2) continue;
 

@@ -35,6 +35,8 @@ public:
 
     int num_samples() const;
 
+    const CpuSample& get_latest_sample() const;
+
     CpuSample prev_sample() const;
 
 private:

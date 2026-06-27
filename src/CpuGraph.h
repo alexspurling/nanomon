@@ -22,6 +22,8 @@ private:
     ref<Shader> m_shader;
     CpuHistory m_cpu_history;
     std::vector<std::vector<float>> m_graph_data;
+    Timestamp m_last_sample_time;
+    bool m_has_sampled = false;
 };
 
 #endif //NANOMON_CPUGRAPH_H
