@@ -14,6 +14,19 @@ using nanogui::Shader;
 
 constexpr float Pi = 3.14159f;
 
+// Colour palette for each core
+static const Vector3f core_colours[] = {
+    {0.0f, 1.0f, 0.0f},  // green
+    {1.0f, 0.0f, 0.0f},  // red
+    {0.0f, 0.5f, 1.0f},  // light blue
+    {1.0f, 1.0f, 0.0f},  // yellow
+    {1.0f, 0.0f, 1.0f},  // magenta
+    {0.0f, 1.0f, 1.0f},  // cyan
+    {1.0f, 0.5f, 0.0f},  // orange
+    {0.5f, 0.0f, 1.0f},  // purple
+};
+static constexpr size_t num_colours = std::size(core_colours);
+
 CpuGraph::CpuGraph(Widget *parent)
     : Canvas(parent, 1) {
 
@@ -29,9 +42,10 @@ CpuGraph::CpuGraph(Widget *parent)
         })",
         // Fragment shader
         R"(#version 330
+        uniform vec3 line_color;
         out vec4 color;
         void main() {
-            color = vec4(0.0, 1.0, 0.0, 1.0);
+            color = vec4(line_color, 1.0);
         })"
     );
 
@@ -101,6 +115,7 @@ void CpuGraph::draw_contents() {
         if (num_points < 2) continue;
 
         m_shader->set_buffer("points", VariableType::Float32, { num_points, 2 }, m_graph_data[i].data());
+        m_shader->set_uniform("line_color", core_colours[i % num_colours]);
 
         m_shader->begin();
         m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, static_cast<int>(num_points), false);
