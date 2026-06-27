@@ -7,6 +7,8 @@
 #include <nanogui/shader.h>
 #include <nanogui/widget.h>
 
+#include "CpuHistory.h"
+
 using namespace nanogui;
 
 class CpuGraph : public Canvas {
@@ -18,6 +20,8 @@ public:
 
 private:
     ref<Shader> m_shader;
+    CpuHistory m_cpu_history;
+    std::vector<std::vector<float>> m_graph_data;
 };
 
 #endif //NANOMON_CPUGRAPH_H

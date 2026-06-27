@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <ostream>
+#include <vector>
 #include <nanogui/opengl.h>
 #include <nanogui/widget.h>
 #include <nanogui/renderpass.h>
@@ -13,6 +14,8 @@ using nanogui::Shader;
 
 constexpr float Pi = 3.14159f;
 
+constexpr size_t MAX_POINTS = 1000; // or whatever your max history length is
+
 CpuGraph::CpuGraph(Widget *parent)
     : Canvas(parent, 1) {
 
@@ -22,49 +25,20 @@ CpuGraph::CpuGraph(Widget *parent)
         "cpu_graph_shader",
         // Vertex shader
         R"(#version 330
-        uniform mat4 mvp;
-        in vec3 position;
-        in vec3 color;
-        out vec4 frag_color;
+        in vec2 points;
         void main() {
-            frag_color = vec4(color, 1.0);
-            gl_Position = mvp * vec4(position, 1.0);
+            gl_Position = vec4(points.x, points.y, 0.0, 1.0);
         })",
         // Fragment shader
         R"(#version 330
         out vec4 color;
-        in vec4 frag_color;
         void main() {
-            color = frag_color;
+            color = vec4(0.0, 1.0, 0.0, 1.0);
         })"
     );
 
-    uint32_t indices[3*12] = {
-        3, 2, 6, 6, 7, 3,
-        4, 5, 1, 1, 0, 4,
-        4, 0, 3, 3, 7, 4,
-        1, 5, 6, 6, 2, 1,
-        0, 1, 2, 2, 3, 0,
-        7, 6, 5, 5, 4, 7
-    };
-
-    float positions[3*8] = {
-        -1.f, 1.f, 1.f, -1.f, -1.f, 1.f,
-        1.f, -1.f, 1.f, 1.f, 1.f, 1.f,
-        -1.f, 1.f, -1.f, -1.f, -1.f, -1.f,
-        1.f, -1.f, -1.f, 1.f, 1.f, -1.f
-    };
-
-    float colors[3*8] = {
-        0, 1, 1, 0, 0, 1,
-        1, 0, 1, 1, 1, 1,
-        0, 1, 0, 0, 0, 0,
-        1, 0, 0, 1, 1, 0
-    };
-
-    m_shader->set_buffer("indices", VariableType::UInt32, {3*12}, indices);
-    m_shader->set_buffer("position", VariableType::Float32, {8, 3}, positions);
-    m_shader->set_buffer("color", VariableType::Float32, {8, 3}, colors);
+    // std::vector<float> zeros(MAX_POINTS * 2, 0.0f);
+    // m_shader->set_buffer("points", VariableType::Float32, { MAX_POINTS, 2 }, zeros.data());
 }
 
 void CpuGraph::perform_layout(NVGcontext *ctx) {
@@ -79,30 +53,58 @@ void CpuGraph::perform_layout(NVGcontext *ctx) {
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
-    Matrix4f view = Matrix4f::look_at(
-        Vector3f(0, -2, -10),
-        Vector3f(0, 0, 0),
-        Vector3f(0, 1, 0)
-    );
+    Timestamp now = std::chrono::system_clock::now();
+    CpuSample latest_sample = m_cpu_history.sample(now);
 
-    Matrix4f model = Matrix4f::rotate(
-        Vector3f(0, 1, 0),
-        (float) glfwGetTime()
-    );
+    int num_samples = m_cpu_history.num_samples();
+    std::cout << "Num samples: " << num_samples << std::endl;
 
-    Matrix4f proj = Matrix4f::perspective(
-        float(25 * Pi / 180),
-        0.1f,
-        20.f,
-        static_cast<float>(m_size.x()) / static_cast<float>(m_size.y())
-    );
+    if (num_samples < 2) {
+        // Need to wait until we have at least 2 samples
+        return;
+    }
 
-    Matrix4f mvp = proj * view * model;
+    CpuSample prev_sample = m_cpu_history.prev_sample();
 
-    m_shader->set_uniform("mvp", mvp);
+    // Resize graph data to match number of cores (if not already sized)
+    if (m_graph_data.size() != latest_sample.samples.size()) {
+        m_graph_data.resize(latest_sample.samples.size());
+    }
 
-    // Draw 12 triangles starting at index 0
-    m_shader->begin();
-    m_shader->draw_array(Shader::PrimitiveType::Triangle, 0, 12 * 3, true);
-    m_shader->end();
+    // TODO ignore sample time for now
+    for (int i = 0; i < latest_sample.samples.size(); i++) {
+        unsigned long cpu_total_diff = latest_sample.samples[i].total_time - prev_sample.samples[i].total_time;
+        unsigned long cpu_idle_diff = latest_sample.samples[i].idle_time - prev_sample.samples[i].idle_time;
+
+        float core_usage = 0.0f;
+        if (cpu_total_diff > 0) {
+            core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) / cpu_total_diff;
+        }
+        if (i == 0) {
+            std::cout << "Core 0 usage: " << core_usage << std::endl;
+        }
+        float y = 2 * core_usage - 1.0f;
+        m_graph_data[i].push_back(y);
+    }
+    // TODO remove data from m_graph_data when we've reached the max number of samples
+
+    for (int i = 0; i < latest_sample.samples.size(); i++) {
+        std::vector<float> data = m_graph_data[i];
+        int num_points = static_cast<int>(data.size());
+        if (num_points < 2) continue;
+
+        std::vector<float> padded(MAX_POINTS * 2, 0.0f);
+        for (int j = 0; j < num_points; j++) {
+            padded[j * 2 + 0] = -1.0f + 2.0f * (float(j) / std::max(float(num_points - 1), 1.0f)); // x
+            padded[j * 2 + 1] = data[j]; // y
+        }
+        m_shader->set_buffer("points", VariableType::Float32, { MAX_POINTS, 2 }, padded.data());
+
+        // m_shader->begin() FAILS WITH THE ERROR:
+        // Shader::begin(): shader "cpu_graph_shader" has an unbound argument "gl_VertexID"!
+        // Caught exception in main loop: "cpu_graph_shader": vertex attribute "points" has an invalid dimension (expected ndim=2, got 1)
+        m_shader->begin();
+        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
+        m_shader->end();
+    }
 }

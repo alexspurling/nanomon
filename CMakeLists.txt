@@ -45,7 +45,10 @@ function(embed_shader TARGET SHADER_FILE)
 endfunction()
 
 add_executable(nanomon src/main.cpp
-        src/CpuGraph.cpp)
+        src/CpuGraph.cpp
+        src/CpuTimesSampler.cpp
+        src/CpuHistory.cpp
+)
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)
 embed_shader(nanomon shaders/simple_frag.glsl simple_frag)
