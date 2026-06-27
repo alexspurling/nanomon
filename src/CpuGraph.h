@@ -32,7 +32,6 @@ private:
     CpuHistory m_cpu_history;
     std::vector<std::vector<float>> m_graph_data;
     Timestamp m_last_sample_time;
-    bool m_has_sampled = false;
     MouseOverCallback m_mouse_over_callback;
 };
 

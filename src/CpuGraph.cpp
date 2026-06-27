@@ -82,27 +82,14 @@ void CpuGraph::draw_contents() {
 
     Timestamp now = std::chrono::system_clock::now();
 
-    // Decide whether to take a new CPU sample this frame
-    bool should_sample = false;
-    if (!m_has_sampled) {
-        m_last_sample_time = now;
-        m_has_sampled = true;
-        should_sample = true;
-    } else {
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             now - m_last_sample_time).count();
-        if (elapsed >= update_interval_ms) {
-            should_sample = true;
-            m_last_sample_time = now;
-        }
-    }
 
-    // Sample CPU data once per update interval
-    if (should_sample) {
+    if (elapsed >= update_interval_ms) {
+        m_last_sample_time = now;
         m_cpu_history.sample(now);
 
         int num_samples = m_cpu_history.num_samples();
-        std::cout << "Num samples: " << num_samples << std::endl;
 
         if (num_samples >= 2) {
             CpuSample latest_sample = m_cpu_history.get_latest_sample();
@@ -123,9 +110,6 @@ void CpuGraph::draw_contents() {
                 if (cpu_total_diff > 0) {
                     core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) /
                         static_cast<float>(cpu_total_diff);
-                }
-                if (i == 0) {
-                    std::cout << "Core 0 usage: " << core_usage << std::endl;
                 }
                 float y = 2 * core_usage - 1.0f;
 
@@ -164,7 +148,7 @@ void CpuGraph::draw_contents() {
         if (n < 2) continue;
 
         for (size_t j = 0; j < n; j++) {
-            // By adding dx here we will draw the last point off the screen at x=1 which ensures smooth animation
+            // By adding dx here we will draw the last point off the screen at x=1, which ensures smooth animation
             float x = 1.0f + dx - static_cast<float>(n - 1 - j) * dx - scroll_offset;
             m_graph_data[i][j * 2] = x;
         }
