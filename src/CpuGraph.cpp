@@ -84,6 +84,22 @@ bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
     return Canvas::mouse_motion_event(p, rel, button, modifiers);
 }
 
+// Compute the normalized y-value (-1..1) for a single core from consecutive samples
+float CpuGraph::compute_core_y(const int core_index, const int sample_index) const {
+    const CpuSample& prev = m_cpu_history.sample_at(sample_index);
+    const CpuSample& curr = m_cpu_history.sample_at(sample_index + 1);
+
+    const unsigned long cpu_total_diff = curr.samples[core_index].total_time - prev.samples[core_index].total_time;
+    const unsigned long cpu_idle_diff = curr.samples[core_index].idle_time - prev.samples[core_index].idle_time;
+
+    float core_usage = 0.0f;
+    if (cpu_total_diff > 0) {
+        core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) /
+            static_cast<float>(cpu_total_diff);
+    }
+    return 2.0f * core_usage - 1.0f;
+}
+
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
@@ -106,19 +122,7 @@ void CpuGraph::draw_contents() {
 
         for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
             for (int j = 0; j < max_points; j++) {
-                const CpuSample& prev = m_cpu_history.sample_at(first_sample_idx + j);
-                const CpuSample& curr = m_cpu_history.sample_at(first_sample_idx + j + 1);
-
-                unsigned long cpu_total_diff = curr.samples[i].total_time - prev.samples[i].total_time;
-                unsigned long cpu_idle_diff = curr.samples[i].idle_time - prev.samples[i].idle_time;
-
-                float core_usage = 0.0f;
-                if (cpu_total_diff > 0) {
-                    core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) /
-                        static_cast<float>(cpu_total_diff);
-                }
-                float y = 2 * core_usage - 1.0f;
-
+                const float y = compute_core_y(i, first_sample_idx + j);
                 m_graph_data[i][j * 2] = 0.0f;      // x placeholder
                 m_graph_data[i][j * 2 + 1] = y;
             }

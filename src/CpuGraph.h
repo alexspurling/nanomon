@@ -27,6 +27,8 @@ public:
 
     bool mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
 
+    float compute_core_y(int core_index, int sample_index) const;
+
 private:
     ref<Shader> m_shader;
     CpuHistory m_cpu_history;
