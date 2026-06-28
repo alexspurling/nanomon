@@ -35,9 +35,7 @@ public:
 
     int num_samples() const;
 
-    const CpuSample& get_latest_sample() const;
-
-    CpuSample prev_sample() const;
+    const CpuSample& sample_at(int index) const;
 
 private:
     CpuTimesSampler m_sampler;

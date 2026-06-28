@@ -28,12 +28,6 @@ int CpuHistory::num_samples() const {
     return m_samples.size();
 }
 
-const CpuSample& CpuHistory::get_latest_sample() const {
-    // TODO guard against empty vector
-    return m_samples.back();
-}
-
-CpuSample CpuHistory::prev_sample() const {
-    // TODO guard against empty or 1 element vector
-    return m_samples[m_samples.size() - 2];
+const CpuSample& CpuHistory::sample_at(int index) const {
+    return m_samples[index];
 }

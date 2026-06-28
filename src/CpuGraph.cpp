@@ -92,8 +92,8 @@ void CpuGraph::draw_contents() {
         int num_samples = m_cpu_history.num_samples();
 
         if (num_samples >= 2) {
-            CpuSample latest_sample = m_cpu_history.get_latest_sample();
-            CpuSample prev_sample = m_cpu_history.prev_sample();
+            const CpuSample& latest_sample = m_cpu_history.sample_at(num_samples - 1);
+            const CpuSample& prev_sample = m_cpu_history.sample_at(num_samples - 2);
 
             // Resize graph data to match number of cores (if not already sized)
             if (m_graph_data.size() != latest_sample.samples.size()) {
