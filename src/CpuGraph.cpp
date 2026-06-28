@@ -95,18 +95,22 @@ void CpuGraph::draw_contents() {
     if (elapsed >= update_interval_ms) {
         m_last_sample_time = now;
         m_cpu_history.sample(now);
+    }
 
-        int num_samples = m_cpu_history.num_samples();
+    int num_samples = m_cpu_history.num_samples();
 
-        if (num_samples >= 2) {
-            const CpuSample& latest_sample = m_cpu_history.sample_at(num_samples - 1);
-            const CpuSample& prev_sample = m_cpu_history.sample_at(num_samples - 2);
+    if (num_samples >= 2) {
+        // Rebuild m_graph_data from scratch using all samples from m_cpu_history
+        int max_points = std::min(num_samples - 1, static_cast<int>(GRAPH_DATA_MAX_POINTS));
+        int first_sample_idx = num_samples - 1 - max_points;
 
-            for (int i = 0; i < static_cast<int>(latest_sample.samples.size()); i++) {
-                unsigned long cpu_total_diff = latest_sample.samples[i].total_time -
-                    prev_sample.samples[i].total_time;
-                unsigned long cpu_idle_diff = latest_sample.samples[i].idle_time -
-                    prev_sample.samples[i].idle_time;
+        for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
+            for (int j = 0; j < max_points; j++) {
+                const CpuSample& prev = m_cpu_history.sample_at(first_sample_idx + j);
+                const CpuSample& curr = m_cpu_history.sample_at(first_sample_idx + j + 1);
+
+                unsigned long cpu_total_diff = curr.samples[i].total_time - prev.samples[i].total_time;
+                unsigned long cpu_idle_diff = curr.samples[i].idle_time - prev.samples[i].idle_time;
 
                 float core_usage = 0.0f;
                 if (cpu_total_diff > 0) {
@@ -115,36 +119,21 @@ void CpuGraph::draw_contents() {
                 }
                 float y = 2 * core_usage - 1.0f;
 
-                // Write new point into the pre-allocated buffer
-                if (m_num_points < GRAPH_DATA_MAX_POINTS) {
-                    // Still have room — write at the end
-                    m_graph_data[i][m_num_points * 2] = 0.0f;     // x placeholder
-                    m_graph_data[i][m_num_points * 2 + 1] = y;
-                } else {
-                    // Buffer is full — shift left by one point, then write at last slot
-                    std::copy(m_graph_data[i].begin() + 2, m_graph_data[i].end(),
-                              m_graph_data[i].begin());
-                    m_graph_data[i][(GRAPH_DATA_MAX_POINTS - 1) * 2] = 0.0f;     // x placeholder
-                    m_graph_data[i][(GRAPH_DATA_MAX_POINTS - 1) * 2 + 1] = y;
-                }
-            }
-
-            if (m_num_points < GRAPH_DATA_MAX_POINTS) {
-                m_num_points++;
+                m_graph_data[i][j * 2] = 0.0f;      // x placeholder
+                m_graph_data[i][j * 2 + 1] = y;
             }
         }
+
+        m_num_points = max_points;
     }
 
-    if (m_cpu_history.num_samples() < 2) {
-        // Need at least 2 samples to render anything
+    if (m_num_points < 2) {
         return;
     }
 
     // Compute smooth scroll offset based on time since last sample
-    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now - m_last_sample_time).count();
-    float scroll_progress = std::min(
-        static_cast<float>(elapsed_ms) / static_cast<float>(update_interval_ms), 1.0f);
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_last_sample_time).count();
+    float scroll_progress = std::min(static_cast<float>(elapsed_ms) / static_cast<float>(update_interval_ms), 1.0f);
     // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
     float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
     float scroll_offset = scroll_progress * dx;
