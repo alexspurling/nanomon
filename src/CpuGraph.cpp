@@ -1,5 +1,6 @@
 #include "CpuGraph.h"
 
+#include <algorithm>
 #include <iostream>
 #include <ostream>
 #include <vector>
@@ -55,8 +56,14 @@ CpuGraph::CpuGraph(Widget *parent)
         })"
     );
 
-    // std::vector<float> zeros(MAX_POINTS * 2, 0.0f);
-    // m_shader->set_buffer("points", VariableType::Float32, { MAX_POINTS, 2 }, zeros.data());
+    // Pre-allocate graph data: determine number of cores from the sampler
+    CpuTimesSampler sampler;
+    auto stat = sampler.sample();
+    size_t num_cores = stat.size();
+    m_graph_data.resize(num_cores);
+    for (auto& core_data : m_graph_data) {
+        core_data.resize(GRAPH_DATA_MAX_POINTS * 2, 0.0f);
+    }
 }
 
 void CpuGraph::perform_layout(NVGcontext *ctx) {
@@ -95,11 +102,6 @@ void CpuGraph::draw_contents() {
             const CpuSample& latest_sample = m_cpu_history.sample_at(num_samples - 1);
             const CpuSample& prev_sample = m_cpu_history.sample_at(num_samples - 2);
 
-            // Resize graph data to match number of cores (if not already sized)
-            if (m_graph_data.size() != latest_sample.samples.size()) {
-                m_graph_data.resize(latest_sample.samples.size());
-            }
-
             for (int i = 0; i < static_cast<int>(latest_sample.samples.size()); i++) {
                 unsigned long cpu_total_diff = latest_sample.samples[i].total_time -
                     prev_sample.samples[i].total_time;
@@ -113,17 +115,22 @@ void CpuGraph::draw_contents() {
                 }
                 float y = 2 * core_usage - 1.0f;
 
-                // Append new point (x placeholder, y value)
-                m_graph_data[i].push_back(0.0f);
-                m_graph_data[i].push_back(y);
-
-                // Trim oldest points if we exceed the maximum
-                size_t n = m_graph_data[i].size() / 2;
-                if (n > GRAPH_DATA_MAX_POINTS) {
-                    size_t excess = n - GRAPH_DATA_MAX_POINTS;
-                    m_graph_data[i].erase(m_graph_data[i].begin(),
-                                          m_graph_data[i].begin() + static_cast<long>(excess * 2));
+                // Write new point into the pre-allocated buffer
+                if (m_num_points < GRAPH_DATA_MAX_POINTS) {
+                    // Still have room — write at the end
+                    m_graph_data[i][m_num_points * 2] = 0.0f;     // x placeholder
+                    m_graph_data[i][m_num_points * 2 + 1] = y;
+                } else {
+                    // Buffer is full — shift left by one point, then write at last slot
+                    std::copy(m_graph_data[i].begin() + 2, m_graph_data[i].end(),
+                              m_graph_data[i].begin());
+                    m_graph_data[i][(GRAPH_DATA_MAX_POINTS - 1) * 2] = 0.0f;     // x placeholder
+                    m_graph_data[i][(GRAPH_DATA_MAX_POINTS - 1) * 2 + 1] = y;
                 }
+            }
+
+            if (m_num_points < GRAPH_DATA_MAX_POINTS) {
+                m_num_points++;
             }
         }
     }
@@ -143,8 +150,8 @@ void CpuGraph::draw_contents() {
     float scroll_offset = scroll_progress * dx;
 
     // Update x-values for all cores every frame (smooth scrolling)
+    size_t n = m_num_points;
     for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
-        size_t n = m_graph_data[i].size() / 2;
         if (n < 2) continue;
 
         for (size_t j = 0; j < n; j++) {
@@ -156,14 +163,13 @@ void CpuGraph::draw_contents() {
 
     // Render each core's line strip
     for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
-        size_t num_points = m_graph_data[i].size() / 2;
-        if (num_points < 2) continue;
+        if (m_num_points < 2) continue;
 
-        m_shader->set_buffer("points", VariableType::Float32, { num_points, 2 }, m_graph_data[i].data());
+        m_shader->set_buffer("points", VariableType::Float32, { m_num_points, 2 }, m_graph_data[i].data());
         m_shader->set_uniform("line_color", core_colours[i % num_colours]);
 
         m_shader->begin();
-        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, static_cast<int>(num_points), false);
+        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, static_cast<int>(m_num_points), false);
         m_shader->end();
     }
 }
