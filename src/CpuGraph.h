@@ -36,6 +36,9 @@ private:
     size_t m_num_points = 0;
     Timestamp m_last_sample_time;
     MouseOverCallback m_mouse_over_callback;
+
+    // This is the number of frames we wait before taking another sample
+    int m_sample_interval;
 };
 
 #endif //NANOMON_CPUGRAPH_H

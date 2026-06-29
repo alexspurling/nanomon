@@ -18,8 +18,11 @@ constexpr float Pi = 3.14159f;
 // Maximum number of points to keep in the graph (oldest points are trimmed)
 static constexpr size_t GRAPH_DATA_MAX_POINTS = 100;
 
-// Update interval — how often to sample CPU data (milliseconds)
-static constexpr long long update_interval_ms = 100;
+// How many times per second we want to sample
+static constexpr int SAMPLE_FREQUENCY = 10;
+
+// Number of samples to average over to calculate the value of each point on the graph
+static constexpr int SAMPLE_WINDOW_SIZE = 3;
 
 // Colour palette for each core
 static const Vector3f core_colours[] = {
@@ -64,6 +67,9 @@ CpuGraph::CpuGraph(Widget *parent)
     for (auto& core_data : m_graph_data) {
         core_data.resize(GRAPH_DATA_MAX_POINTS * 2, 0.0f);
     }
+
+    // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
+    m_sample_interval = 60 / SAMPLE_FREQUENCY;
 }
 
 void CpuGraph::perform_layout(NVGcontext *ctx) {
@@ -106,34 +112,24 @@ int frame_count = 0;
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
-    Timestamp now = std::chrono::system_clock::now();
-
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - m_last_sample_time).count();
-
-    // if (elapsed >= update_interval_ms) {
-    //     m_last_sample_time = now;
-    //     m_cpu_history.sample(now);
-    // }
-
-    if (frame_count % 6 == 0) {
-        m_last_sample_time = now;
+    const int frame_interval_remainder = frame_count % m_sample_interval;
+    if (frame_interval_remainder == 0) {
+        // TODO Remove timestamp?
+        const Timestamp now = std::chrono::system_clock::now();
         m_cpu_history.sample(now);
     }
 
     frame_count++;
 
-    int num_samples = m_cpu_history.num_samples();
-
-    int sample_window_size = 3;
-    if (num_samples > sample_window_size) {
+    const int num_samples = m_cpu_history.num_samples();
+    if (num_samples > SAMPLE_WINDOW_SIZE) {
         // Rebuild m_graph_data from scratch using all samples from m_cpu_history
-        int max_points = std::min(num_samples - sample_window_size, static_cast<int>(GRAPH_DATA_MAX_POINTS));
-        int first_sample_idx = num_samples - max_points;
+        const int max_points = std::min(num_samples - SAMPLE_WINDOW_SIZE, static_cast<int>(GRAPH_DATA_MAX_POINTS));
+        const int first_sample_idx = num_samples - max_points;
 
         for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
             for (int j = 0; j < max_points; j++) {
-                const float y = compute_core_y(i, first_sample_idx + j, sample_window_size);
+                const float y = compute_core_y(i, first_sample_idx + j, SAMPLE_WINDOW_SIZE);
                 m_graph_data[i][j * 2] = 0.0f;      // x placeholder
                 m_graph_data[i][j * 2 + 1] = y;
             }
@@ -147,20 +143,19 @@ void CpuGraph::draw_contents() {
     }
 
     // Compute smooth scroll offset based on time since last sample
-    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_last_sample_time).count();
-    float scroll_progress = std::min(static_cast<float>(elapsed_ms) / static_cast<float>(update_interval_ms), 1.0f);
+    const float scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
     // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
-    float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
-    float scroll_offset = scroll_progress * dx;
+    constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
+    const float scroll_offset = scroll_progress * dx;
 
     // Update x-values for all cores every frame (smooth scrolling)
-    size_t n = m_num_points;
+    const size_t n = m_num_points;
     for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
         if (n < 2) continue;
 
         for (size_t j = 0; j < n; j++) {
             // By adding dx here we will draw the last point off the screen at x=1, which ensures smooth animation
-            float x = 1.0f + dx - static_cast<float>(n - 1 - j) * dx - scroll_offset;
+            const float x = 1.0f + dx - static_cast<float>(n - 1 - j) * dx - scroll_offset;
             m_graph_data[i][j * 2] = x;
         }
     }
