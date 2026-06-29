@@ -33,7 +33,6 @@ private:
     ref<Shader> m_shader;
     CpuHistory m_cpu_history;
     std::vector<std::vector<float>> m_graph_data;
-    size_t m_num_points = 0;
     Timestamp m_last_sample_time;
     MouseOverCallback m_mouse_over_callback;
 

@@ -93,6 +93,9 @@ bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
 // Compute the normalized y-value (-1..1) for a single core from consecutive samples
 float CpuGraph::compute_core_y(const int core_id, const int sample_index, const int sample_window_size) const {
 
+    if (sample_index - sample_window_size < 0) {
+        return 0;
+    }
     const CoreSample& prev = m_cpu_history.sample_at(core_id, sample_index - sample_window_size);
     const CoreSample& curr = m_cpu_history.sample_at(core_id, sample_index);
 
@@ -122,53 +125,43 @@ void CpuGraph::draw_contents() {
     frame_count++;
 
     const int num_samples = m_cpu_history.num_samples();
-    if (num_samples > SAMPLE_WINDOW_SIZE) {
-        // Rebuild m_graph_data from scratch using all samples from m_cpu_history
-        const int max_points = std::min(num_samples - SAMPLE_WINDOW_SIZE, static_cast<int>(GRAPH_DATA_MAX_POINTS));
-        const int first_sample_idx = num_samples - max_points;
+    // Rebuild m_graph_data from scratch using all samples from m_cpu_history
+    const int num_points = std::min(num_samples - SAMPLE_WINDOW_SIZE, static_cast<int>(GRAPH_DATA_MAX_POINTS));
 
-        for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
-            for (int j = 0; j < max_points; j++) {
-                const float y = compute_core_y(i, first_sample_idx + j, SAMPLE_WINDOW_SIZE);
-                m_graph_data[i][j * 2] = 0.0f;      // x placeholder
-                m_graph_data[i][j * 2 + 1] = y;
+    if (num_points > 0) {
+        const int first_sample_idx = num_samples - num_points;
+
+        for (int core_id = 0; core_id < static_cast<int>(m_graph_data.size()); core_id++) {
+            for (int j = 0; j < num_points; j++) {
+                const float y = compute_core_y(core_id, first_sample_idx + j, SAMPLE_WINDOW_SIZE);
+                m_graph_data[core_id][j * 2] = 0.0f;      // x placeholder
+                m_graph_data[core_id][j * 2 + 1] = y;
             }
         }
 
-        m_num_points = max_points;
-    }
+        // Compute smooth scroll offset based on time since last sample
+        const float scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
+        // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
+        constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
+        const float scroll_offset = scroll_progress * dx;
 
-    if (m_num_points < 2) {
-        return;
-    }
-
-    // Compute smooth scroll offset based on time since last sample
-    const float scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
-    // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
-    constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
-    const float scroll_offset = scroll_progress * dx;
-
-    // Update x-values for all cores every frame (smooth scrolling)
-    const size_t n = m_num_points;
-    for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
-        if (n < 2) continue;
-
-        for (size_t j = 0; j < n; j++) {
-            // By adding dx here we will draw the last point off the screen at x=1, which ensures smooth animation
-            const float x = 1.0f + dx - static_cast<float>(n - 1 - j) * dx - scroll_offset;
-            m_graph_data[i][j * 2] = x;
+        // Update x-values for all cores every frame (smooth scrolling)
+        for (int core_id = 0; core_id < static_cast<int>(m_graph_data.size()); core_id++) {
+            for (int i = 0; i < num_points; i++) {
+                // By adding dx here we will draw the last point off the screen at x=1, which ensures smooth animation
+                const float x = 1.0f + dx - static_cast<float>(num_points - 1 - i) * dx - scroll_offset;
+                m_graph_data[core_id][i * 2] = x;
+            }
         }
-    }
 
-    // Render each core's line strip
-    for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
-        if (m_num_points < 2) continue;
+        // Render each core's line strip
+        for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
+            m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data[i].data());
+            m_shader->set_uniform("line_color", core_colours[i % num_colours]);
 
-        m_shader->set_buffer("points", VariableType::Float32, { m_num_points, 2 }, m_graph_data[i].data());
-        m_shader->set_uniform("line_color", core_colours[i % num_colours]);
-
-        m_shader->begin();
-        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, static_cast<int>(m_num_points), false);
-        m_shader->end();
+            m_shader->begin();
+            m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
+            m_shader->end();
+        }
     }
 }
