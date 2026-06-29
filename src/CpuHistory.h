@@ -7,10 +7,10 @@ using Timestamp = std::chrono::system_clock::time_point;
 
 struct CoreSample {
 
-    unsigned long total_time;
-    unsigned long idle_time;
+    double total_time;
+    double idle_time;
 
-    CoreSample(const long total, const long idle)
+    CoreSample(const double total, const double idle)
         : total_time(total), idle_time(idle) {
     }
 };

@@ -90,22 +90,41 @@ bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
     return Canvas::mouse_motion_event(p, rel, button, modifiers);
 }
 
-// Compute the normalized y-value (-1..1) for a single core from consecutive samples
-float CpuGraph::compute_core_y(const int core_id, const int sample_index, const int sample_window_size) const {
+const CoreSample CpuGraph::interpolate_sample_at(const int core_id, const float x) const {
+    const int index_a = floor(x);
+    if (static_cast<float>(index_a) == x) {
+        return m_cpu_history.sample_at(core_id, index_a);
+    }
 
-    if (sample_index - sample_window_size < 0) {
+    // std::cout << "interpolating for x: " << x << std::endl;
+    const CoreSample& sample_a = m_cpu_history.sample_at(core_id, index_a);
+    const CoreSample& sample_b = m_cpu_history.sample_at(core_id, index_a + 1);
+
+    const double t = x - index_a;
+    const double interpolated_total_time = static_cast<double>(sample_a.total_time) * (1.0f - t) + static_cast<double>(sample_b.total_time) * t;
+    const double interpolated_idle_time = static_cast<double>(sample_a.idle_time) * (1.0f - t) + static_cast<double>(sample_b.idle_time) * t;
+    return CoreSample(interpolated_total_time, interpolated_idle_time);
+}
+
+// Compute the normalized y-value (-1..1) for a single core from consecutive samples
+float CpuGraph::compute_core_y(const int core_id, const float sample_x, const int sample_window_size) const {
+
+    if (sample_x - sample_window_size < 0) {
         return 0;
     }
-    const CoreSample& prev = m_cpu_history.sample_at(core_id, sample_index - sample_window_size);
-    const CoreSample& curr = m_cpu_history.sample_at(core_id, sample_index);
+    const CoreSample prev = interpolate_sample_at(core_id, sample_x - sample_window_size);
+    const CoreSample curr = interpolate_sample_at(core_id, sample_x);
 
-    const unsigned long cpu_total_diff = curr.total_time - prev.total_time;
-    const unsigned long cpu_idle_diff = curr.idle_time - prev.idle_time;
+    const double cpu_total_diff = curr.total_time - prev.total_time;
+    const double cpu_idle_diff = curr.idle_time - prev.idle_time;
+
+    if (cpu_idle_diff > cpu_total_diff) {
+        std::cout << "cpu idle diff is greater than total diff" << std::endl;
+    }
 
     float core_usage = 0.0f;
     if (cpu_total_diff > 0) {
-        core_usage = static_cast<float>(cpu_total_diff - cpu_idle_diff) /
-            static_cast<float>(cpu_total_diff);
+        core_usage = (cpu_total_diff - cpu_idle_diff) / cpu_total_diff;
     }
     return 2.0f * core_usage - 1.0f;
 }
@@ -133,7 +152,7 @@ void CpuGraph::draw_contents() {
 
         for (int core_id = 0; core_id < static_cast<int>(m_graph_data.size()); core_id++) {
             for (int j = 0; j < num_points; j++) {
-                const float y = compute_core_y(core_id, first_sample_idx + j, SAMPLE_WINDOW_SIZE);
+                const float y = compute_core_y(core_id, first_sample_idx + (j * m_zoom), SAMPLE_WINDOW_SIZE);
                 m_graph_data[core_id][j * 2] = 0.0f;      // x placeholder
                 m_graph_data[core_id][j * 2 + 1] = y;
             }

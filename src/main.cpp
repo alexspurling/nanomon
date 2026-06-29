@@ -4,6 +4,7 @@
 #include <nanogui/layout.h>
 #include <nanogui/label.h>
 #include <nanogui/button.h>
+#include <nanogui/slider.h>
 #include <nanogui/vscrollpanel.h>
 #include <nanogui/texture.h>
 #include <nanogui/shader.h>
@@ -11,6 +12,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <iomanip>
 
 #define STB_IMAGE_STATIC
 #define STB_IMAGE_IMPLEMENTATION
@@ -54,6 +56,21 @@ public:
         Widget *cpu_graph_container = new Widget(this);
         cpu_graph_container->set_fixed_height(250);
         CpuGraph *cpu_graph = new CpuGraph(cpu_graph_container);
+
+        // Zoom slider row
+        Widget *zoom_row = new Widget(this);
+        zoom_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        new Label(zoom_row, "Zoom:", "sans-bold");
+        Slider *zoom_slider = new Slider(zoom_row);
+        zoom_slider->set_range({0.5f, 1.0f});
+        zoom_slider->set_value(1.0f);
+        Label *zoom_value_label = new Label(zoom_row, "1.0x", "sans-bold");
+        zoom_slider->set_callback([cpu_graph, zoom_value_label](float value) {
+            cpu_graph->set_zoom(value);
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(3) << value << "x";
+            zoom_value_label->set_caption(oss.str());
+        });
 
         m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
 
