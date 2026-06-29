@@ -10,9 +10,8 @@ struct CoreSample {
     unsigned long total_time;
     unsigned long idle_time;
 
-    CoreSample(long total, long idle)
+    CoreSample(const long total, const long idle)
         : total_time(total), idle_time(idle) {
-
     }
 };
 
@@ -31,13 +30,13 @@ public:
 
     CpuHistory();
 
-    CpuSample sample(const Timestamp &timestamp);
+    void sample(const Timestamp &timestamp);
 
     int num_samples() const;
 
-    const CpuSample& sample_at(int index) const;
+    const CoreSample& sample_at(int core_id, int index) const;
 
 private:
     CpuTimesSampler m_sampler;
-    std::vector<CpuSample> m_samples;  // new member
+    std::vector<std::vector<CoreSample>> m_cpu_history;
 };

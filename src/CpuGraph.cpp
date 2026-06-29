@@ -85,12 +85,13 @@ bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
 }
 
 // Compute the normalized y-value (-1..1) for a single core from consecutive samples
-float CpuGraph::compute_core_y(const int core_index, const int sample_index) const {
-    const CpuSample& prev = m_cpu_history.sample_at(sample_index);
-    const CpuSample& curr = m_cpu_history.sample_at(sample_index + 1);
+float CpuGraph::compute_core_y(const int core_id, const int sample_index, const int sample_window_size) const {
 
-    const unsigned long cpu_total_diff = curr.samples[core_index].total_time - prev.samples[core_index].total_time;
-    const unsigned long cpu_idle_diff = curr.samples[core_index].idle_time - prev.samples[core_index].idle_time;
+    const CoreSample& prev = m_cpu_history.sample_at(core_id, sample_index - sample_window_size);
+    const CoreSample& curr = m_cpu_history.sample_at(core_id, sample_index);
+
+    const unsigned long cpu_total_diff = curr.total_time - prev.total_time;
+    const unsigned long cpu_idle_diff = curr.idle_time - prev.idle_time;
 
     float core_usage = 0.0f;
     if (cpu_total_diff > 0) {
@@ -100,6 +101,8 @@ float CpuGraph::compute_core_y(const int core_index, const int sample_index) con
     return 2.0f * core_usage - 1.0f;
 }
 
+int frame_count = 0;
+
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
@@ -108,21 +111,29 @@ void CpuGraph::draw_contents() {
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             now - m_last_sample_time).count();
 
-    if (elapsed >= update_interval_ms) {
+    // if (elapsed >= update_interval_ms) {
+    //     m_last_sample_time = now;
+    //     m_cpu_history.sample(now);
+    // }
+
+    if (frame_count % 6 == 0) {
         m_last_sample_time = now;
         m_cpu_history.sample(now);
     }
 
+    frame_count++;
+
     int num_samples = m_cpu_history.num_samples();
 
-    if (num_samples >= 2) {
+    int sample_window_size = 3;
+    if (num_samples > sample_window_size) {
         // Rebuild m_graph_data from scratch using all samples from m_cpu_history
-        int max_points = std::min(num_samples - 1, static_cast<int>(GRAPH_DATA_MAX_POINTS));
-        int first_sample_idx = num_samples - 1 - max_points;
+        int max_points = std::min(num_samples - sample_window_size, static_cast<int>(GRAPH_DATA_MAX_POINTS));
+        int first_sample_idx = num_samples - max_points;
 
         for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
             for (int j = 0; j < max_points; j++) {
-                const float y = compute_core_y(i, first_sample_idx + j);
+                const float y = compute_core_y(i, first_sample_idx + j, sample_window_size);
                 m_graph_data[i][j * 2] = 0.0f;      // x placeholder
                 m_graph_data[i][j * 2 + 1] = y;
             }

@@ -1,33 +1,27 @@
 #include "CpuHistory.h"
 
 CpuHistory::CpuHistory()
-    : m_sampler()
 {
+    auto stat = m_sampler.sample();
+    size_t num_cores = stat.size();
+    m_cpu_history.resize(num_cores);
 }
 
-CpuSample CpuHistory::sample(const Timestamp &timestamp)
-{
+void CpuHistory::sample(const Timestamp &timestamp) {
     const std::vector<CpuStat> cpu_stats = m_sampler.sample();
 
-    std::vector<CoreSample> samples;
-    samples.reserve(cpu_stats.size());
-
-    for (const CpuStat& stat : cpu_stats)
-    {
+    // Record a CoreSample for each core
+    for (int i = 0; i < static_cast<int>(cpu_stats.size()); i++) {
+        const CpuStat& stat = cpu_stats[i];
         const unsigned long total_time = stat.user + stat.nice + stat.system + stat.idle + stat.iowait + stat.irq + stat.softirq + stat.steal;
-        samples.push_back(CoreSample(total_time, stat.idle));
+        m_cpu_history[i].push_back(CoreSample(total_time, stat.idle));
     }
-
-    CpuSample latest_sample = CpuSample(timestamp, samples);
-    m_samples.push_back(latest_sample);
-
-    return latest_sample;
 }
 
 int CpuHistory::num_samples() const {
-    return m_samples.size();
+    return m_cpu_history[0].size();
 }
 
-const CpuSample& CpuHistory::sample_at(int index) const {
-    return m_samples[index];
+const CoreSample& CpuHistory::sample_at(const int core_id, const int index) const {
+    return m_cpu_history[core_id][index];
 }

@@ -18,5 +18,5 @@ struct CpuStat {
 class CpuTimesSampler {
 public:
     // Returns one CpuStat per CPU core (cpu0, cpu1, ...)
-    std::vector<CpuStat> sample() const;
+    static std::vector<CpuStat> sample();
 };

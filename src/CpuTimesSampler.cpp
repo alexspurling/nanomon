@@ -6,7 +6,7 @@
 #include <sstream>
 
 
-std::vector<CpuStat> CpuTimesSampler::sample() const {
+std::vector<CpuStat> CpuTimesSampler::sample() {
     std::vector<CpuStat> result;
 
     std::ifstream file("/proc/stat");
