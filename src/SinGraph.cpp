@@ -17,7 +17,7 @@ using nanogui::Shader;
 constexpr float Pi = 3.14159f;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 100;
 
 // How many times per second we want to sample
 static constexpr int SAMPLE_FREQUENCY = 1;
@@ -39,8 +39,9 @@ SinGraph::SinGraph(Widget *parent)
         // Vertex shader
         R"(#version 330
         in vec2 points;
+        uniform float x_offset;
         void main() {
-            gl_Position = vec4(points.x, points.y, 0.0, 1.0);
+            gl_Position = vec4(points.x - x_offset, points.y, 0.0, 1.0);
         })",
         // Fragment shader
         R"(#version 330
@@ -57,8 +58,9 @@ SinGraph::SinGraph(Widget *parent)
         // Vertex shader
         R"(#version 330
         in vec2 points;
+        uniform float x_offset;
         void main() {
-            gl_Position = vec4(points.x, points.y, 0.0, 1.0);
+            gl_Position = vec4(points.x - x_offset, points.y, 0.0, 1.0);
         })",
         // Fragment shader
         R"(#version 330
@@ -74,7 +76,19 @@ SinGraph::SinGraph(Widget *parent)
     // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
     m_sample_interval = 60 / SAMPLE_FREQUENCY;
 
-    m_frame_count = 0;
+    initialise_x_values();
+}
+
+void SinGraph::initialise_x_values() {
+    // Simplified from: dx = dx_orig * x_scale
+    constexpr float dx = 2.0f / (GRAPH_DATA_MAX_POINTS - 2.0f);
+
+    const float left_x = -1.0f;
+    for (int i = 0; i < GRAPH_DATA_MAX_POINTS; i++) {
+        const float x = left_x + i * dx;
+        m_graph_data[i * 2] = x;
+        std::cout << "i: " << i << " x: " << x << std::endl;
+    }
 }
 
 void SinGraph::perform_layout(NVGcontext *ctx) {
@@ -105,7 +119,7 @@ float SinGraph::compute_y(const float sample_x) {
     return sine_y;
 }
 
-void SinGraph::draw_grid(const int num_points) {
+void SinGraph::draw_grid(const int num_points, const float x_offset) {
     // Build a buffer with 2 vertices per vertical grid line (bottom to top)
     std::vector<float> grid_points;
     grid_points.reserve(num_points * 4);
@@ -117,6 +131,7 @@ void SinGraph::draw_grid(const int num_points) {
         grid_points.push_back(1.0f);
     }
     m_grid_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points * 2), 2 }, grid_points.data());
+    m_grid_shader->set_uniform("x_offset", x_offset);
     m_grid_shader->set_uniform("line_color", GRID_COLOUR);
 
     m_grid_shader->begin();
@@ -134,39 +149,38 @@ void SinGraph::draw_contents() {
     const int frame_interval_remainder = m_frame_count % m_sample_interval;
     scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
 
+    // distance between points in screen coordinates
+    // (scaled by 1 point so that we always draw the last part of the graph at x >= 1.0)
+    constexpr float screen_dx = 2.0f / (num_points - 2);
+    // distance between points in data coordinates
+    const float dx = (m_end_x - m_start_x) / (num_points - 1);
+
     if (!m_paused) {
         if (frame_interval_remainder == 0) {
-            m_x_offset += 1.0f;
+            m_x_offset += dx;
         }
         m_frame_count++;
     }
 
-    if (num_points > 0) {
-        // Compute y-values from the current x offset
-        for (int j = 0; j < num_points; j++) {
-            const float y = compute_y(m_x_offset + j);
-            m_graph_data[j * 2] = 0.0f;      // x placeholder
-            m_graph_data[j * 2 + 1] = y;
-        }
-        // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
-        constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
-        const float scroll_offset = scroll_progress * dx;
-
-        // Update x-values for all cores every frame (smooth scrolling)
-        for (int i = 0; i < num_points; i++) {
-            // By adding dx here we will draw the last point off the screen at x=1, which ensures smooth animation
-            const float x = 1.0f + dx - static_cast<float>(num_points - 1 - i) * dx - scroll_offset;
-            m_graph_data[i * 2] = x;
-        }
-
-        draw_grid(num_points);
-
-        // Render each core's line strip
-        m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data.data());
-        m_shader->set_uniform("line_color", GRAPH_COLOUR);
-
-        m_shader->begin();
-        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
-        m_shader->end();
+    // Compute y-values by sampling sin(x) linearly between start_x and end_x
+    for (int j = 0; j < num_points; j++) {
+        const float t = static_cast<float>(j) / (num_points - 1);
+        const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+        const float y = compute_y(sample_x);
+        // m_graph_data[j * 2] = 0.0f;      // x placeholder
+        m_graph_data[j * 2 + 1] = y;
     }
+
+    const float smooth_scrolling_x_offset = scroll_progress * screen_dx;
+
+    draw_grid(num_points, smooth_scrolling_x_offset);
+
+    // Render each core's line strip
+    m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data.data());
+    m_shader->set_uniform("x_offset", smooth_scrolling_x_offset);
+    m_shader->set_uniform("line_color", GRAPH_COLOUR);
+
+    m_shader->begin();
+    m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
+    m_shader->end();
 }

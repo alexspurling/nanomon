@@ -73,6 +73,57 @@ public:
             zoom_value_label->set_caption(oss.str());
         });
 
+        // Start X slider row
+        auto *start_x_row = new Widget(this);
+        start_x_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        new Label(start_x_row, "Start X:", "sans-bold");
+        auto *start_x_slider = new Slider(start_x_row);
+        start_x_slider->set_range({0.0f, 50.0f});
+        start_x_slider->set_value(0.0f);
+        start_x_slider->set_fixed_width(200);
+        auto *start_x_label = new Label(start_x_row, "0.0", "sans-bold");
+        start_x_label->set_fixed_width(50);
+        start_x_slider->set_callback([cpu_graph, start_x_label](float value) {
+            cpu_graph->set_start_x(value);
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(3) << value;
+            start_x_label->set_caption(oss.str());
+        });
+
+        // End X slider row
+        auto *end_x_row = new Widget(this);
+        end_x_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        new Label(end_x_row, "End X:", "sans-bold");
+        auto *end_x_slider = new Slider(end_x_row);
+        end_x_slider->set_range({2.0f, 50.0f});
+        end_x_slider->set_value(10.0f);
+        end_x_slider->set_fixed_width(200);
+        auto *end_x_label = new Label(end_x_row, "2.0", "sans-bold");
+        end_x_label->set_fixed_width(50);
+        end_x_slider->set_callback([cpu_graph, end_x_label](float value) {
+            cpu_graph->set_end_x(value);
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(3) << value;
+            end_x_label->set_caption(oss.str());
+        });
+
+        // Sample offset
+        auto *sample_offset_row = new Widget(this);
+        sample_offset_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        new Label(sample_offset_row, "Sample offset:", "sans-bold");
+        auto *sample_offset_slider = new Slider(sample_offset_row);
+        sample_offset_slider->set_range({-0.1f, 0.1f});
+        sample_offset_slider->set_value(0.0f);
+        sample_offset_slider->set_fixed_width(200);
+        auto *sample_offset_label = new Label(sample_offset_row, "20.0", "sans-bold");
+        sample_offset_label->set_fixed_width(50);
+        sample_offset_slider->set_callback([cpu_graph, sample_offset_label](float value) {
+            cpu_graph->set_sample_offset(value);
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(5) << value;
+            sample_offset_label->set_caption(oss.str());
+        });
+        
         // Pause button row
         Widget *pause_row = new Widget(this);
         pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));

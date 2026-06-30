@@ -18,12 +18,25 @@ public:
 
     void perform_layout(NVGcontext *ctx) override;
 
-    void draw_grid(int num_points);
+    void draw_grid(int num_points, float x_offset);
 
     void draw_contents() override;
 
     void set_zoom(float zoom) { m_zoom = zoom; }
+
     float zoom() const { return m_zoom; }
+
+    void set_start_x(float x) { m_start_x = x; }
+
+    float start_x() const { return m_start_x; }
+
+    void set_end_x(float x) { m_end_x = x; }
+
+    float end_x() const { return m_end_x; }
+
+    void set_sample_offset(float sample_offset) { m_sample_offset = sample_offset; }
+
+    void initialise_x_values();
 
     void set_paused(const bool paused) { m_paused = paused; }
     bool paused() const { return m_paused; }
@@ -43,6 +56,9 @@ private:
     ref<Shader> m_grid_shader;
     std::vector<float> m_graph_data;
     float m_zoom = 1.0f;
+    float m_start_x = 0.0f;
+    float m_end_x = 10.0f;
+    float m_sample_offset = 0.0f;
     float m_x_offset = 0.0f;
     bool m_paused = false;
     MouseOverCallback m_mouse_over_callback;
