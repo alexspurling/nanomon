@@ -22,6 +22,7 @@
 #include "CpuGraph.h"
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
+#include "SinGraph.h"
 
 using namespace nanogui;
 
@@ -55,7 +56,7 @@ public:
 
         Widget *cpu_graph_container = new Widget(this);
         cpu_graph_container->set_fixed_height(250);
-        CpuGraph *cpu_graph = new CpuGraph(cpu_graph_container);
+        SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
 
         // Zoom slider row
         Widget *zoom_row = new Widget(this);
@@ -70,6 +71,16 @@ public:
             std::ostringstream oss;
             oss << std::fixed << std::setprecision(3) << value << "x";
             zoom_value_label->set_caption(oss.str());
+        });
+
+        // Pause button row
+        Widget *pause_row = new Widget(this);
+        pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        Button *pause_button = new Button(pause_row, "Pause");
+        pause_button->set_flags(Button::ToggleButton);
+        pause_button->set_change_callback([cpu_graph, pause_button](bool pushed) {
+            cpu_graph->set_paused(pushed);
+            pause_button->set_caption(pushed ? "Resume" : "Pause");
         });
 
         m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
