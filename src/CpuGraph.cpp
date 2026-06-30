@@ -16,13 +16,13 @@ using nanogui::Shader;
 constexpr float Pi = 3.14159f;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 100;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
 
 // How many times per second we want to sample
-static constexpr int SAMPLE_FREQUENCY = 10;
+static constexpr int SAMPLE_FREQUENCY = 1;
 
 // Number of samples to average over to calculate the value of each point on the graph
-static constexpr int SAMPLE_WINDOW_SIZE = 3;
+static constexpr int SAMPLE_WINDOW_SIZE = 2;
 
 // Colour palette for each core
 static const Vector3f core_colours[] = {
@@ -37,6 +37,8 @@ static const Vector3f core_colours[] = {
 };
 static constexpr size_t num_colours = std::size(core_colours);
 
+static const Vector3f GRID_COLOUR = {0.0f, 0.4f, 0.0f};
+
 CpuGraph::CpuGraph(Widget *parent)
     : Canvas(parent, 1) {
 
@@ -44,6 +46,24 @@ CpuGraph::CpuGraph(Widget *parent)
     m_shader = new Shader(
         render_pass(),
         "cpu_graph_shader",
+        // Vertex shader
+        R"(#version 330
+        in vec2 points;
+        void main() {
+            gl_Position = vec4(points.x, points.y, 0.0, 1.0);
+        })",
+        // Fragment shader
+        R"(#version 330
+        uniform vec3 line_color;
+        out vec4 color;
+        void main() {
+            color = vec4(line_color, 1.0);
+        })"
+        );
+
+    m_grid_shader = new Shader(
+        render_pass(),
+        "cpu_graph_grid_shader",
         // Vertex shader
         R"(#version 330
         in vec2 points;
@@ -152,7 +172,7 @@ void CpuGraph::draw_contents() {
 
         for (int core_id = 0; core_id < static_cast<int>(m_graph_data.size()); core_id++) {
             for (int j = 0; j < num_points; j++) {
-                const float y = compute_core_y(core_id, first_sample_idx + (j * m_zoom), SAMPLE_WINDOW_SIZE);
+                const float y = compute_core_y(core_id, first_sample_idx + j, SAMPLE_WINDOW_SIZE);
                 m_graph_data[core_id][j * 2] = 0.0f;      // x placeholder
                 m_graph_data[core_id][j * 2 + 1] = y;
             }
@@ -172,6 +192,23 @@ void CpuGraph::draw_contents() {
                 m_graph_data[core_id][i * 2] = x;
             }
         }
+
+        // Build a buffer with 2 vertices per vertical grid line (bottom to top)
+        std::vector<float> grid_points;
+        grid_points.reserve(num_points * 4);
+        for (int i = 0; i < num_points; i++) {
+            float x = m_graph_data[0][i * 2];
+            grid_points.push_back(x);
+            grid_points.push_back(-1.0f);
+            grid_points.push_back(x);
+            grid_points.push_back(1.0f);
+        }
+        m_grid_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points * 2), 2 }, grid_points.data());
+        m_grid_shader->set_uniform("line_color", GRID_COLOUR);
+
+        m_grid_shader->begin();
+        m_grid_shader->draw_array(Shader::PrimitiveType::Line, 0, num_points * 2, false);
+        m_grid_shader->end();
 
         // Render each core's line strip
         for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {

@@ -36,6 +36,7 @@ public:
 
 private:
     ref<Shader> m_shader;
+    ref<Shader> m_grid_shader;
     CpuHistory m_cpu_history;
     std::vector<std::vector<float>> m_graph_data;
     Timestamp m_last_sample_time;
