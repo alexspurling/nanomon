@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <iostream>
 #include <ostream>
+#include <sstream>
 #include <vector>
 #include <nanogui/opengl.h>
 #include <nanogui/widget.h>
 #include <nanogui/renderpass.h>
+#include <nanogui/theme.h>
 #include <GLFW/glfw3.h>
 
 using nanogui::Vector3f;
@@ -38,6 +40,8 @@ static const Vector3f core_colours[] = {
 static constexpr size_t num_colours = std::size(core_colours);
 
 static const Vector3f GRID_COLOUR = {0.0f, 0.4f, 0.0f};
+
+int frame_count = 0;
 
 CpuGraph::CpuGraph(Widget *parent)
     : Canvas(parent, 1) {
@@ -101,6 +105,42 @@ void CpuGraph::perform_layout(NVGcontext *ctx) {
     Widget::perform_layout(ctx);
 }
 
+void CpuGraph::draw(NVGcontext *ctx) {
+    // Let Canvas do its normal OpenGL rendering (including draw_contents)
+    Canvas::draw(ctx);
+
+    // Now overlay grid line labels using NanoVG
+    if (!m_graph_data.empty()) {
+        const int num_samples = m_cpu_history.num_samples();
+        const int num_points = std::min(num_samples - SAMPLE_WINDOW_SIZE,
+                                        static_cast<int>(GRAPH_DATA_MAX_POINTS));
+        if (num_points > 0) {
+            nvgFontSize(ctx, 14.0f);
+            nvgFontFace(ctx, "sans");
+            nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+            nvgFillColor(ctx, m_theme->m_text_color);
+
+            constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
+            const float scroll_progress = static_cast<float>(frame_count % m_sample_interval) / m_sample_interval;
+            const float scroll_offset = scroll_progress * dx;
+
+            for (int i = 0; i < num_points; i++) {
+                float ndc_x = 1.0f + dx - static_cast<float>(num_points - 1 - i) * dx - scroll_offset;
+
+                // Convert NDC x (-1..1) to pixel x within the widget
+                float px = m_pos.x() + (ndc_x + 1.0f) * 0.5f * m_size.x();
+
+                // Pixel y = top of the widget (with small padding)
+                float py = m_pos.y();
+
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(2) << ndc_x;
+                nvgText(ctx, px, py, oss.str().c_str(), nullptr);
+            }
+        }
+    }
+}
+
 bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
     if (m_mouse_over_callback) {
         float x = 2.0f * p.x() / static_cast<float>(m_size.x()) - 1.0f;
@@ -148,8 +188,6 @@ float CpuGraph::compute_core_y(const int core_id, const float sample_x, const in
     }
     return 2.0f * core_usage - 1.0f;
 }
-
-int frame_count = 0;
 
 void CpuGraph::draw_contents() {
     using namespace nanogui;

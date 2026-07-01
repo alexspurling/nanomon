@@ -7,6 +7,7 @@
 #include <nanogui/canvas.h>
 #include <nanogui/shader.h>
 #include <nanogui/widget.h>
+#include <nanogui/theme.h>
 
 #include "CpuHistory.h"
 
@@ -19,6 +20,7 @@ public:
     CpuGraph(Widget *parent);
 
     void perform_layout(NVGcontext *ctx) override;
+    void draw(NVGcontext *ctx) override;
     void draw_contents() override;
 
     void set_zoom(float zoom) { m_zoom = zoom; }
