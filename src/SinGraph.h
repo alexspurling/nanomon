@@ -20,6 +20,8 @@ public:
 
     void draw_grid(int num_points, float x_offset);
 
+    void draw(NVGcontext *ctx) override;
+
     void draw_contents() override;
 
     void set_zoom(float zoom) { m_zoom = zoom; }
@@ -60,12 +62,12 @@ private:
     float m_end_x = 10.0f;
     float m_sample_offset = 0.0f;
     float m_x_offset = 0.0f;
-    bool m_paused = false;
+    bool m_paused = true;
     MouseOverCallback m_mouse_over_callback;
 
     // This is the number of frames we wait before taking another sample
     int m_sample_interval;
-    int m_frame_count;
+    int m_frame_count = 0;
 };
 
 #endif //NANOMON_SinGraph_H

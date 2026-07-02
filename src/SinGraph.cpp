@@ -2,12 +2,16 @@
 
 #include <iostream>
 #include <ostream>
+#include <sstream>
 #include <vector>
 #include <cmath>
+#include <memory>
+#include <iomanip>
 
 #include <nanogui/opengl.h>
 #include <nanogui/widget.h>
 #include <nanogui/renderpass.h>
+#include <nanogui/theme.h>
 #include <GLFW/glfw3.h>
 
 using nanogui::Vector3f;
@@ -17,7 +21,7 @@ using nanogui::Shader;
 constexpr float Pi = 3.14159f;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 100;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
 
 // How many times per second we want to sample
 static constexpr int SAMPLE_FREQUENCY = 1;
@@ -139,15 +143,53 @@ void SinGraph::draw_grid(const int num_points, const float x_offset) {
     m_grid_shader->end();
 }
 
+void SinGraph::draw(NVGcontext *ctx) {
+    // Let Canvas do its normal OpenGL rendering (including draw_contents)
+    Canvas::draw(ctx);
+
+    const int num_points = GRAPH_DATA_MAX_POINTS;
+
+    nvgFontSize(ctx, 14.0f);
+    nvgFontFace(ctx, "sans");
+    nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    nvgFillColor(ctx, m_theme->m_text_color);
+
+    // distance between points in screen coordinates
+    // (scaled by 1 point so that we always draw the last part of the graph at x >= 1.0)
+    constexpr float screen_dx = 2.0f / (num_points - 2);
+
+    const float scroll_progress = static_cast<float>(m_frame_count % m_sample_interval) / m_sample_interval;
+
+    for (int i = 0; i < num_points; i++) {
+        const float t = static_cast<float>(i) / (num_points - 1);
+        const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+
+        const float smooth_scrolling_x_offset = scroll_progress * screen_dx;
+        const float position_x = m_graph_data[i * 2] - smooth_scrolling_x_offset;
+
+        // Convert NDC x (-1..1) to pixel x within the widget
+        float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
+
+        // Pixel y = top of the widget (with small padding)
+        float py = m_pos.y() + 4.0f;
+
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(2) << sample_x;
+        nvgText(ctx, px, py, oss.str().c_str(), nullptr);
+    }
+}
+
 void SinGraph::draw_contents() {
     using namespace nanogui;
 
     const int num_points = GRAPH_DATA_MAX_POINTS;
 
-    float scroll_progress = 0.0f;
+    if (!m_paused) {
+        m_frame_count++;
+    }
 
     const int frame_interval_remainder = m_frame_count % m_sample_interval;
-    scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
+    float scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
 
     // distance between points in screen coordinates
     // (scaled by 1 point so that we always draw the last part of the graph at x >= 1.0)
@@ -155,11 +197,8 @@ void SinGraph::draw_contents() {
     // distance between points in data coordinates
     const float dx = (m_end_x - m_start_x) / (num_points - 1);
 
-    if (!m_paused) {
-        if (frame_interval_remainder == 0) {
-            m_x_offset += dx;
-        }
-        m_frame_count++;
+    if (!m_paused && frame_interval_remainder == 0) {
+        m_x_offset += dx;
     }
 
     // Compute y-values by sampling sin(x) linearly between start_x and end_x

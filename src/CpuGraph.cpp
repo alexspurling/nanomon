@@ -131,7 +131,7 @@ void CpuGraph::draw(NVGcontext *ctx) {
                 float px = m_pos.x() + (ndc_x + 1.0f) * 0.5f * m_size.x();
 
                 // Pixel y = top of the widget (with small padding)
-                float py = m_pos.y();
+                float py = m_pos.y() + 4.0f;
 
                 std::ostringstream oss;
                 oss << std::fixed << std::setprecision(2) << ndc_x;
