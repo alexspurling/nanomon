@@ -8,10 +8,9 @@
 #include <nanogui/shader.h>
 #include <nanogui/widget.h>
 
-using namespace nanogui;
+#include "LineGraph.h"
 
-// Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 200;
+using namespace nanogui;
 
 class SinGraph : public Canvas {
 public:
@@ -27,25 +26,19 @@ public:
 
     void draw_contents() override;
 
-    void set_zoom(float zoom) { m_zoom = zoom; }
+    void set_start_x(float x) { m_line_graph.set_start_x(x); }
 
-    float zoom() const { return m_zoom; }
+    float start_x() const { return static_cast<float>(m_line_graph.start_x()); }
 
-    void set_start_x(float x) { m_start_x = x; }
+    void set_end_x(float x) { m_line_graph.set_end_x(x); }
 
-    float start_x() const { return m_start_x; }
-
-    void set_end_x(float x) { m_end_x = x; }
-
-    float end_x() const { return m_end_x; }
+    float end_x() const { return static_cast<float>(m_line_graph.end_x()); }
 
     float get_speed() const {
-        return m_scroll_speed;
+        return static_cast<float>(m_line_graph.scroll_speed());
     }
 
-    void set_speed(float speed) { m_scroll_speed = speed; }
-
-    void initialise_x_values();
+    void set_speed(float speed) { m_line_graph.set_scroll_speed(speed); }
 
     void set_paused(const bool paused) { m_paused = paused; }
     bool paused() const { return m_paused; }
@@ -62,25 +55,18 @@ public:
 
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
-    static double sample_at(double x);
-
-    static double compute_y(double sample_x);
-
 private:
+    static double sin(double x);
+
     ref<Shader> m_shader;
     ref<Shader> m_grid_shader;
-    std::vector<float> m_graph_data;
-    float m_zoom = 1.0f;
-    float m_start_x = 0.0f;
-    float m_end_x = 10.0f;
-    double m_x_offset = 0.0f;
+    LineGraph m_line_graph;
     bool m_paused = true;
     bool m_dragging = false;
     bool m_was_paused_before_drag = true;
     double m_drag_offset = 0.0;
     double m_last_frame_time = 0;
     double m_game_time = 0;
-    double m_scroll_speed = 1;
     MouseOverCallback m_mouse_over_callback;
 };
 

@@ -48,6 +48,7 @@ add_executable(nanomon src/main.cpp
         src/CpuGraph.cpp
         src/CpuTimesSampler.cpp
         src/CpuHistory.cpp
+        src/LineGraph.cpp
         src/SinGraph.cpp
 )
 

@@ -30,8 +30,15 @@ static const Vector3f GRAPH_COLOUR = {1.0f, 0.0f, 0.0f};
 
 static const Vector3f GRID_COLOUR = {0.0f, 0.2f, 0.0f};
 
+static constexpr size_t MAX_POINTS = 200;
+
+double SinGraph::sin(double x) {
+    // sin(x) returns -1..1, map to 0..1
+    return (std::sin(x) + 1.0) / 2.0;
+}
+
 SinGraph::SinGraph(Widget *parent)
-    : Canvas(parent, 1) {
+    : Canvas(parent, 1), m_line_graph(MAX_POINTS, &SinGraph::sin) {
 
     using namespace nanogui;
     m_shader = new Shader(
@@ -72,22 +79,8 @@ SinGraph::SinGraph(Widget *parent)
         })"
     );
 
-    m_graph_data.resize(GRAPH_DATA_MAX_POINTS * 2, 0.0f);
-
-    initialise_x_values();
 }
 
-void SinGraph::initialise_x_values() {
-    // Simplified from: dx = dx_orig * x_scale
-    constexpr float dx = 2.0f / (GRAPH_DATA_MAX_POINTS - 2.0f);
-
-    const float left_x = -1.0f;
-    for (int i = 0; i < GRAPH_DATA_MAX_POINTS; i++) {
-        const float x = left_x + i * dx;
-        m_graph_data[i * 2] = x;
-        std::cout << "i: " << i << " x: " << x << std::endl;
-    }
-}
 
 void SinGraph::perform_layout(NVGcontext *ctx) {
     if (parent()) {
@@ -137,29 +130,24 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
         m_drag_offset += -rel.x() * 2.0 / static_cast<double>(m_size.x());
 
         // Check if accumulated drag exceeds one grid spacing in data-space
-        const int num_points = GRAPH_DATA_MAX_POINTS;
-        const double dx_data = (m_end_x - m_start_x) / (num_points - 2.0);
-        const double data_delta = m_drag_offset * (m_end_x - m_start_x) / 2.0;
+        const int num_points = static_cast<int>(m_line_graph.size());
+        const double dx_data = m_line_graph.get_data_width() / (num_points - 2.0);
+        const double data_delta = m_drag_offset * m_line_graph.get_data_width() / 2.0;
 
         if (std::abs(data_delta) > dx_data) {
             // Number of whole grid spacings to shift
             const int num_steps = static_cast<int>(data_delta / dx_data);
             const double shift = num_steps * dx_data;
 
-            m_start_x += shift;
-            m_end_x += shift;
+            m_line_graph.set_start_x(m_line_graph.start_x() + shift);
+            m_line_graph.set_end_x(m_line_graph.end_x() + shift);
 
             // Recompute y-values at the new sample positions for the shifted window
-            for (int i = 0; i < num_points; i++) {
-                const double t = static_cast<double>(i) / (num_points - 2);
-                const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-                const double y = compute_y(sample_x);
-                m_graph_data[i * 2 + 1] = static_cast<float>(y);
-            }
+            m_line_graph.recompute_y_values();
 
             // Reset m_drag_offset to the remainder (less than one grid spacing)
             const double remainder_data_delta = data_delta - shift;
-            m_drag_offset = remainder_data_delta * 2.0 / (m_end_x - m_start_x);
+            m_drag_offset = remainder_data_delta * 2.0 / m_line_graph.get_data_width();
         }
 
         return true;
@@ -169,9 +157,9 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
 
 bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     // calculate the new left and right positions
-    float cur_width = m_end_x - m_start_x;
-    constexpr float scroll_factor = 1.1;
-    float new_width;
+    double cur_width = m_line_graph.get_data_width();
+    constexpr double scroll_factor = 1.1;
+    double new_width;
     if (rel.y() < 0) {
         // zoom out so new width is bigger
         new_width = cur_width * scroll_factor;
@@ -179,32 +167,23 @@ bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
         new_width = cur_width / scroll_factor;
     }
     // Origin around the current cursor position
-    float mouse_x_ratio = p.x() / static_cast<float>(m_size.x());
-    const float mouse_x = m_start_x + cur_width * mouse_x_ratio;
-    m_start_x = mouse_x - mouse_x_ratio * new_width;
-    m_end_x = mouse_x + (1.0f - mouse_x_ratio) * new_width;
+    double mouse_x_ratio = static_cast<double>(p.x()) / static_cast<double>(m_size.x());
+    const double mouse_x = m_line_graph.start_x() + cur_width * mouse_x_ratio;
+    m_line_graph.set_start_x(mouse_x - mouse_x_ratio * new_width);
+    m_line_graph.set_end_x(mouse_x + (1.0 - mouse_x_ratio) * new_width);
 
-    std::cout << "new start_x: " << m_start_x << ", end_x: " << m_end_x << std::endl;
+    std::cout << "new start_x: " << m_line_graph.start_x() << ", end_x: " << m_line_graph.end_x() << std::endl;
 
     return Canvas::scroll_event(p, rel);
 }
 
-double SinGraph::sample_at(const double x) {
-    return sin(x);
-}
-
-// Compute the normalized y-value (-1..1) for a single core from consecutive samples
-double SinGraph::compute_y(const double sample_x) {
-    const double sine_y = sample_at(sample_x);
-    return sine_y;
-}
 
 void SinGraph::draw_grid(const int num_points, const double smooth_scrolling_x_offset) {
     // Build a buffer with 2 vertices per vertical grid line (bottom to top)
     std::vector<float> grid_points;
-    grid_points.reserve(num_points * 4);
+    grid_points.reserve(static_cast<size_t>(num_points) * 4);
     for (int i = 0; i < num_points; i++) {
-        float x = m_graph_data[i * 2];
+        float x = m_line_graph.data()[i * 2];
         grid_points.push_back(x);
         grid_points.push_back(-1.0f);
         grid_points.push_back(x);
@@ -223,12 +202,10 @@ void SinGraph::draw(NVGcontext *ctx) {
     // Let Canvas do its normal OpenGL rendering (including draw_contents)
     Canvas::draw(ctx);
 
-    const int num_points = GRAPH_DATA_MAX_POINTS;
+    const size_t num_points = m_line_graph.size();
 
-    // Compute smooth_scrolling_x_offset using the same logic as draw_contents
-    const double total_scroll = m_scroll_speed * m_game_time;
-    const double remainder_data = total_scroll - m_x_offset;
-    const double smooth_scrolling_x_offset = remainder_data * 2.0 / (m_end_x - m_start_x);
+    // Get smooth_scrolling_x_offset from LineGraph
+    const double smooth_scrolling_x_offset = m_line_graph.get_smooth_scrolling_x_offset();
 
     // Add drag offset so text labels scroll with the graph and grid during drag
     const double total_x_offset = smooth_scrolling_x_offset + m_drag_offset;
@@ -238,12 +215,11 @@ void SinGraph::draw(NVGcontext *ctx) {
     nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
     nvgFillColor(ctx, m_theme->m_text_color);
 
-    for (int i = 0; i < num_points; i++) {
-        // Compute sample_x using the same logic as draw_contents
-        const double t = static_cast<double>(i) / (num_points - 2);
-        const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+    for (size_t i = 0; i < num_points; i++) {
+        // Compute sample_x from LineGraph
+        const double sample_x = m_line_graph.get_sample_x(static_cast<int>(i));
 
-        const float position_x = m_graph_data[i * 2] - static_cast<float>(total_x_offset);
+        const float position_x = m_line_graph.data()[i * 2] - static_cast<float>(total_x_offset);
 
         // Convert NDC x (-1..1) to pixel x within the widget
         float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
@@ -265,49 +241,22 @@ void SinGraph::draw_contents() {
     m_last_frame_time = current_time;
     m_game_time += delta_time;
 
-    const int num_points = GRAPH_DATA_MAX_POINTS;
+    // Delegate data advancement to LineGraph, passing the computed game time
+    m_line_graph.advance_time(m_game_time);
 
-    // Spacing between adjacent nodes in DATA space -- used only for deciding when we need
-    // to resample compute_y(), and for advancing m_x_offset (which is a data-space quantity).
-    const double dx_data = (m_end_x - m_start_x) / (num_points - 2);
-
-    // Total distance we should have scrolled, in DATA-space units, since the sim began.
-    const double total_scroll = m_scroll_speed * m_game_time;
-
-    // Snap down to the last whole node-spacing we've crossed -- this is the offset that
-    // determines which x-values we actually need sampled into the buffer right now.
-    const double quantized_offset = std::floor(total_scroll / dx_data) * dx_data;
-
-    // Only re-sample compute_y() across the buffer when we've advanced a full data-space
-    // node spacing since the last update.
-    if (quantized_offset != m_x_offset) {
-        std::cout << "total_scroll: " << total_scroll << ", quantized_offset: " << quantized_offset << ", m_x_offset: " << m_x_offset << ", dx: " << dx_data << std::endl;
-        m_x_offset = quantized_offset;
-
-        for (int i = 0; i < num_points; i++) {
-            const double t = static_cast<double>(i) / (num_points - 2);
-            const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-            const double y = compute_y(sample_x);
-            m_graph_data[i * 2 + 1] = static_cast<float>(y);
-        }
-    }
-
-    // Leftover scroll within the current data-space step, in [0, dx_data).
-    const double remainder_data = total_scroll - m_x_offset;
-    // Convert that remainder into SCREEN-space units before handing it to the shader,
-    // since the shader offsets the screen-space x-values stored in the buffer.
-    const double smooth_scrolling_x_offset = remainder_data * 2.0 / (m_end_x - m_start_x);
+    const size_t num_points = m_line_graph.size();
+    const double smooth_scrolling_x_offset = m_line_graph.get_smooth_scrolling_x_offset();
 
     // Add the drag offset so both graph and grid scroll together during drag
     const double total_x_offset = smooth_scrolling_x_offset + m_drag_offset;
 
-    m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data.data());
+    m_shader->set_buffer("points", VariableType::Float32, { num_points, 2 }, m_line_graph.data());
     m_shader->set_uniform("x_offset", static_cast<float>(total_x_offset));
     m_shader->set_uniform("line_color", GRAPH_COLOUR);
     m_shader->begin();
-    m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
+    m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, static_cast<int>(num_points), false);
     m_shader->end();
 
     // For some reason, this grid gets drawn below the graph line even though we initiate it last
-    draw_grid(num_points, total_x_offset);
+    draw_grid(static_cast<int>(num_points), total_x_offset);
 }

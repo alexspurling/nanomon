@@ -60,21 +60,6 @@ public:
 
         SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
 
-        // Zoom slider row
-        Widget *zoom_row = new Widget(this);
-        zoom_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        new Label(zoom_row, "Zoom:", "sans-bold");
-        Slider *zoom_slider = new Slider(zoom_row);
-        zoom_slider->set_range({0.5f, 1.0f});
-        zoom_slider->set_value(1.0f);
-        Label *zoom_value_label = new Label(zoom_row, "1.0x", "sans-bold");
-        zoom_slider->set_callback([cpu_graph, zoom_value_label](float value) {
-            cpu_graph->set_zoom(value);
-            std::ostringstream oss;
-            oss << std::fixed << std::setprecision(3) << value << "x";
-            zoom_value_label->set_caption(oss.str());
-        });
-
         // Start X slider row
         auto *start_x_row = new Widget(this);
         start_x_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
