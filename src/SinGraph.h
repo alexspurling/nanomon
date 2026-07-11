@@ -11,7 +11,7 @@
 using namespace nanogui;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 300;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
 
 class SinGraph : public Canvas {
 public:
@@ -39,11 +39,11 @@ public:
 
     float end_x() const { return m_end_x; }
 
-    float get_step() {
-        return m_step;
+    float get_speed() {
+        return m_scroll_speed;
     }
 
-    void set_step(float step) { m_step = step; }
+    void set_speed(float speed) { m_scroll_speed = speed; }
 
     void initialise_x_values();
 
@@ -58,9 +58,9 @@ public:
 
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
-    static float sample_at(float x);
+    static double sample_at(double x);
 
-    static float compute_y(float sample_x);
+    static double compute_y(double sample_x);
 
 private:
     ref<Shader> m_shader;
@@ -69,9 +69,11 @@ private:
     float m_zoom = 1.0f;
     float m_start_x = 0.0f;
     float m_end_x = 10.0f;
-    float m_step = (m_end_x - m_start_x) / (GRAPH_DATA_MAX_POINTS - 1);
-    float m_x_offset = 0.0f;
+    double m_x_offset = 0.0f;
     bool m_paused = true;
+    double m_last_frame_time = 0;
+    double m_game_time = 0;
+    double m_scroll_speed = 1;
     MouseOverCallback m_mouse_over_callback;
 
     // This is the number of frames we wait before taking another sample

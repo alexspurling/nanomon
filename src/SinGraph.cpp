@@ -129,13 +129,13 @@ bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     return Canvas::scroll_event(p, rel);
 }
 
-float SinGraph::sample_at(const float x) {
+double SinGraph::sample_at(const double x) {
     return sin(x);
 }
 
 // Compute the normalized y-value (-1..1) for a single core from consecutive samples
-float SinGraph::compute_y(const float sample_x) {
-    const float sine_y = sample_at(sample_x);
+double SinGraph::compute_y(const double sample_x) {
+    const double sine_y = sample_at(sample_x);
     return sine_y;
 }
 
@@ -202,63 +202,47 @@ void SinGraph::draw(NVGcontext *ctx) {
 void SinGraph::draw_contents() {
     using namespace nanogui;
 
-    if (!m_paused) {
-        m_frame_count++;
-    }
-
     double current_time = glfwGetTime();
-
+    double delta_time = m_paused ? 0.0 : current_time - m_last_frame_time;
+    m_last_frame_time = current_time;
+    m_game_time += delta_time;
 
     const int num_points = GRAPH_DATA_MAX_POINTS;
-    // The width of the graph in screen coordinates (it's slightly more than 2.0 because we render one extra point to the left of x = -1.0 and right of x = 1.0
-    const double graph_screen_width = (2.0f + 2.0f / (num_points - 2));
 
-    // data x value we increase for each sample. we initialise this to (m_end_x - m_start_x) / (num_points - 1)
-    // which is (10.0f - 0.0f) / 100
-    double step_x = (m_end_x - m_start_x) / (num_points - 1);
-    // m_step = step_x;
-    step_x = m_step;
+    // Spacing between adjacent nodes in DATA space -- used only for deciding when we need
+    // to resample compute_y(), and for advancing m_x_offset (which is a data-space quantity).
+    const double dx_data = (m_end_x - m_start_x) / (num_points - 2);
 
-    // distance between points in screen coordinates
-    const double screen_dx = step_x * graph_screen_width / (m_end_x - m_start_x);
+    // Total distance we should have scrolled, in DATA-space units, since the sim began.
+    const double total_scroll = m_scroll_speed * m_game_time;
 
-    // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
-    // m_sample_interval = 60.0 / SAMPLE_FREQUENCY / (100.0 / (m_end_x - m_start_x));
+    // Snap down to the last whole node-spacing we've crossed -- this is the offset that
+    // determines which x-values we actually need sampled into the buffer right now.
+    const double quantized_offset = std::floor(total_scroll / dx_data) * dx_data;
 
-    m_sample_interval = static_cast<double>(SAMPLE_FREQUENCY) / (1000.0 / (m_end_x - m_start_x));
+    // Only re-sample compute_y() across the buffer when we've advanced a full data-space
+    // node spacing since the last update.
+    if (quantized_offset != m_x_offset) {
+        std::cout << "total_scroll: " << total_scroll << ", quantized_offset: " << quantized_offset << ", m_x_offset: " << m_x_offset << ", dx: " << dx_data << std::endl;
+        m_x_offset = quantized_offset;
 
-    double time_since_last_sample = current_time - last_sample_time;
-    if (time_since_last_sample > m_sample_interval) {
-        m_x_offset += step_x;
-        last_sample_time = current_time;
-        time_since_last_sample -= m_sample_interval;
+        for (int i = 0; i < num_points; i++) {
+            const double t = static_cast<double>(i) / (num_points - 2);
+            const double x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+            const double y = compute_y(x);
+            m_graph_data[i * 2 + 1] = static_cast<float>(y);
+        }
     }
 
-    // const int frame_interval_remainder = m_frame_count % m_sample_interval;
-    //
-    // if (!m_paused && frame_interval_remainder == 0) {
-    //     m_x_offset += step_x;
-    // }
+    // Leftover scroll within the current data-space step, in [0, dx_data).
+    const double remainder_data = total_scroll - m_x_offset;
+    // Convert that remainder into SCREEN-space units before handing it to the shader,
+    // since the shader offsets the screen-space x-values stored in the buffer.
+    const double smooth_scrolling_x_offset = remainder_data * 2.0 / (m_end_x - m_start_x);
 
-    // Compute y-values by sampling sin(x) linearly between start_x and end_x
-    for (int j = 0; j < num_points; j++) {
-        const float t = static_cast<float>(j) / (num_points - 1);
-        const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-        const float y = compute_y(sample_x);
-        m_graph_data[j * 2 + 1] = y;
-    }
-
-    // const double scroll_progress = static_cast<double>(frame_interval_remainder) / m_sample_interval;
-    const double scroll_progress = time_since_last_sample / m_sample_interval;
-    const double smooth_scrolling_x_offset = scroll_progress * screen_dx;
-
-    // std::cout << "smooth_scrolling_x_offset: " << smooth_scrolling_x_offset << ", scroll_progress: " << scroll_progress << ", screen_dx: " << screen_dx << std::endl;
-
-    // Render each core's line strip
     m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data.data());
     m_shader->set_uniform("x_offset", static_cast<float>(smooth_scrolling_x_offset));
     m_shader->set_uniform("line_color", GRAPH_COLOUR);
-
     m_shader->begin();
     m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
     m_shader->end();

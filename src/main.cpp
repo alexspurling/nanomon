@@ -110,20 +110,20 @@ public:
         });
 
         // Screen dx
-        auto *step_row = new Widget(this);
-        step_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        new Label(step_row, "Step x:", "sans-bold");
-        auto *step_slider = new Slider(step_row);
-        step_slider->set_range({0.0f, 1.0f});
-        step_slider->set_value(cpu_graph->get_step());
-        step_slider->set_fixed_width(200);
-        auto *step_label = new Label(step_row, std::to_string(step_slider->value()), "sans-bold");
-        step_label->set_fixed_width(60);
-        step_slider->set_callback([cpu_graph, step_label](float value) {
-            cpu_graph->set_step(value);
+        auto *speed_row = new Widget(this);
+        speed_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        new Label(speed_row, "speed x:", "sans-bold");
+        auto *speed_slider = new Slider(speed_row);
+        speed_slider->set_range({0.0f, 10.0f});
+        speed_slider->set_value(cpu_graph->get_speed());
+        speed_slider->set_fixed_width(200);
+        auto *speed_label = new Label(speed_row, std::to_string(speed_slider->value()), "sans-bold");
+        speed_label->set_fixed_width(60);
+        speed_slider->set_callback([cpu_graph, speed_label](float value) {
+            cpu_graph->set_speed(value);
             std::ostringstream oss;
-            oss << std::fixed << std::setprecision(7) << value;
-            step_label->set_caption(oss.str());
+            oss << std::fixed << std::setprecision(3) << value;
+            speed_label->set_caption(oss.str());
         });
 
         // Pause button row
