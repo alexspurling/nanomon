@@ -100,7 +100,7 @@ public:
         end_x_slider->set_range({2.0f, 50.0f});
         end_x_slider->set_value(10.0f);
         end_x_slider->set_fixed_width(200);
-        auto *end_x_label = new Label(end_x_row, "2.0", "sans-bold");
+        auto *end_x_label = new Label(end_x_row, "10.0", "sans-bold");
         end_x_label->set_fixed_width(50);
         end_x_slider->set_callback([cpu_graph, end_x_label](float value) {
             cpu_graph->set_end_x(value);
@@ -109,34 +109,41 @@ public:
             end_x_label->set_caption(oss.str());
         });
 
-        // Sample offset
-        auto *sample_offset_row = new Widget(this);
-        sample_offset_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        new Label(sample_offset_row, "Sample offset:", "sans-bold");
-        auto *sample_offset_slider = new Slider(sample_offset_row);
-        sample_offset_slider->set_range({-0.1f, 0.1f});
-        sample_offset_slider->set_value(0.0f);
-        sample_offset_slider->set_fixed_width(200);
-        auto *sample_offset_label = new Label(sample_offset_row, "20.0", "sans-bold");
-        sample_offset_label->set_fixed_width(50);
-        sample_offset_slider->set_callback([cpu_graph, sample_offset_label](float value) {
-            cpu_graph->set_sample_offset(value);
+        // Screen dx
+        auto *step_row = new Widget(this);
+        step_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        new Label(step_row, "Step x:", "sans-bold");
+        auto *step_slider = new Slider(step_row);
+        step_slider->set_range({0.0f, 1.0f});
+        step_slider->set_value(cpu_graph->get_step());
+        step_slider->set_fixed_width(200);
+        auto *step_label = new Label(step_row, std::to_string(step_slider->value()), "sans-bold");
+        step_label->set_fixed_width(60);
+        step_slider->set_callback([cpu_graph, step_label](float value) {
+            cpu_graph->set_step(value);
             std::ostringstream oss;
-            oss << std::fixed << std::setprecision(5) << value;
-            sample_offset_label->set_caption(oss.str());
+            oss << std::fixed << std::setprecision(7) << value;
+            step_label->set_caption(oss.str());
         });
 
         // Pause button row
         Widget *pause_row = new Widget(this);
         pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        Button *pause_button = new Button(pause_row, "Pause");
+        Button *pause_button = new Button(pause_row, "Resume");
         pause_button->set_flags(Button::ToggleButton);
+        pause_button->set_pushed(true);
         pause_button->set_change_callback([cpu_graph, pause_button](bool pushed) {
             cpu_graph->set_paused(pushed);
             pause_button->set_caption(pushed ? "Resume" : "Pause");
         });
 
         m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
+
+        cpu_graph->set_mouse_over_callback([this](float x, float y) {
+            std::ostringstream oss;
+            oss << "Graph mouse coords: (" << x << ", " << y << ")";
+            m_coord_label->set_caption(oss.str());
+        });
 
         cpu_graph->set_mouse_over_callback([this](float x, float y) {
             std::ostringstream oss;

@@ -10,6 +10,9 @@
 
 using namespace nanogui;
 
+// Maximum number of points to keep in the graph (oldest points are trimmed)
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 300;
+
 class SinGraph : public Canvas {
 public:
     using MouseOverCallback = std::function<void(float x, float y)>;
@@ -36,7 +39,11 @@ public:
 
     float end_x() const { return m_end_x; }
 
-    void set_sample_offset(float sample_offset) { m_sample_offset = sample_offset; }
+    float get_step() {
+        return m_step;
+    }
+
+    void set_step(float step) { m_step = step; }
 
     void initialise_x_values();
 
@@ -49,6 +56,8 @@ public:
 
     bool mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
 
+    bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
+
     static float sample_at(float x);
 
     static float compute_y(float sample_x);
@@ -60,14 +69,15 @@ private:
     float m_zoom = 1.0f;
     float m_start_x = 0.0f;
     float m_end_x = 10.0f;
-    float m_sample_offset = 0.0f;
+    float m_step = (m_end_x - m_start_x) / (GRAPH_DATA_MAX_POINTS - 1);
     float m_x_offset = 0.0f;
     bool m_paused = true;
     MouseOverCallback m_mouse_over_callback;
 
     // This is the number of frames we wait before taking another sample
-    int m_sample_interval;
+    double m_sample_interval;
     int m_frame_count = 0;
+    double last_sample_time = 0;
 };
 
 #endif //NANOMON_SinGraph_H

@@ -20,9 +20,6 @@ using nanogui::Shader;
 
 constexpr float Pi = 3.14159f;
 
-// Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
-
 // How many times per second we want to sample
 static constexpr int SAMPLE_FREQUENCY = 1;
 
@@ -77,9 +74,6 @@ SinGraph::SinGraph(Widget *parent)
 
     m_graph_data.resize(GRAPH_DATA_MAX_POINTS * 2, 0.0f);
 
-    // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
-    m_sample_interval = 60 / SAMPLE_FREQUENCY;
-
     initialise_x_values();
 }
 
@@ -111,6 +105,28 @@ bool SinGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
         m_mouse_over_callback(x, y);
     }
     return Canvas::mouse_motion_event(p, rel, button, modifiers);
+}
+
+bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
+    // calculate the new left and right positions
+    float cur_width = m_end_x - m_start_x;
+    constexpr float scroll_factor = 1.1;
+    float new_width;
+    if (rel.y() < 0) {
+        // zoom out so new width is bigger
+        new_width = cur_width * scroll_factor;
+    } else {
+        new_width = cur_width / scroll_factor;
+    }
+    // Origin around the current cursor position
+    float mouse_x_ratio = p.x() / static_cast<float>(m_size.x());
+    const float mouse_x = m_start_x + cur_width * mouse_x_ratio;
+    m_start_x = mouse_x - mouse_x_ratio * new_width;
+    m_end_x = mouse_x + (1.0f - mouse_x_ratio) * new_width;
+
+    std::cout << "new start_x: " << m_start_x << ", end_x: " << m_end_x << std::endl;
+
+    return Canvas::scroll_event(p, rel);
 }
 
 float SinGraph::sample_at(const float x) {
@@ -147,76 +163,100 @@ void SinGraph::draw(NVGcontext *ctx) {
     // Let Canvas do its normal OpenGL rendering (including draw_contents)
     Canvas::draw(ctx);
 
-    const int num_points = GRAPH_DATA_MAX_POINTS;
-
-    nvgFontSize(ctx, 14.0f);
-    nvgFontFace(ctx, "sans");
-    nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
-    nvgFillColor(ctx, m_theme->m_text_color);
+    // const int num_points = GRAPH_DATA_MAX_POINTS;
+    //
+    // nvgFontSize(ctx, 14.0f);
+    // nvgFontFace(ctx, "sans");
+    // nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    // nvgFillColor(ctx, m_theme->m_text_color);
 
     // distance between points in screen coordinates
     // (scaled by 1 point so that we always draw the last part of the graph at x >= 1.0)
-    constexpr float screen_dx = 2.0f / (num_points - 2);
+    // constexpr float screen_dx = 2.0f / (num_points - 2);
 
-    const float scroll_progress = static_cast<float>(m_frame_count % m_sample_interval) / m_sample_interval;
-
-    for (int i = 0; i < num_points; i++) {
-        const float t = static_cast<float>(i) / (num_points - 1);
-        const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-
-        const float smooth_scrolling_x_offset = scroll_progress * screen_dx;
-        const float position_x = m_graph_data[i * 2] - smooth_scrolling_x_offset;
-
-        // Convert NDC x (-1..1) to pixel x within the widget
-        float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
-
-        // Pixel y = top of the widget (with small padding)
-        float py = m_pos.y() + 4.0f;
-
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(2) << sample_x;
-        nvgText(ctx, px, py, oss.str().c_str(), nullptr);
-    }
+    // const float scroll_progress = static_cast<float>(m_frame_count % m_sample_interval) / m_sample_interval;
+    //
+    // for (int i = 0; i < num_points; i++) {
+    //     const float t = static_cast<float>(i) / (num_points - 1);
+    //     const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+    //
+    //     const float smooth_scrolling_x_offset = scroll_progress * screen_dx;
+    //     const float position_x = m_graph_data[i * 2] - smooth_scrolling_x_offset;
+    //
+    //     // Convert NDC x (-1..1) to pixel x within the widget
+    //     float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
+    //
+    //     // Pixel y = top of the widget (with small padding)
+    //     float py = m_pos.y() + 4.0f;
+    //
+    //     std::ostringstream oss;
+    //     oss << std::fixed << std::setprecision(2) << sample_x;
+    //     nvgText(ctx, px, py, oss.str().c_str(), nullptr);
+    // }
+    nvgFontSize(ctx, 16.0f);
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(6) << m_sample_interval;
+    nvgText(ctx, 40, 20, oss.str().c_str(), nullptr);
 }
 
 void SinGraph::draw_contents() {
     using namespace nanogui;
 
-    const int num_points = GRAPH_DATA_MAX_POINTS;
-
     if (!m_paused) {
         m_frame_count++;
     }
 
-    const int frame_interval_remainder = m_frame_count % m_sample_interval;
-    float scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
+    double current_time = glfwGetTime();
+
+
+    const int num_points = GRAPH_DATA_MAX_POINTS;
+    // The width of the graph in screen coordinates (it's slightly more than 2.0 because we render one extra point to the left of x = -1.0 and right of x = 1.0
+    const double graph_screen_width = (2.0f + 2.0f / (num_points - 2));
+
+    // data x value we increase for each sample. we initialise this to (m_end_x - m_start_x) / (num_points - 1)
+    // which is (10.0f - 0.0f) / 100
+    double step_x = (m_end_x - m_start_x) / (num_points - 1);
+    // m_step = step_x;
+    step_x = m_step;
 
     // distance between points in screen coordinates
-    // (scaled by 1 point so that we always draw the last part of the graph at x >= 1.0)
-    constexpr float screen_dx = 2.0f / (num_points - 2);
-    // distance between points in data coordinates
-    const float dx = (m_end_x - m_start_x) / (num_points - 1);
+    const double screen_dx = step_x * graph_screen_width / (m_end_x - m_start_x);
 
-    if (!m_paused && frame_interval_remainder == 0) {
-        m_x_offset += dx;
+    // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
+    // m_sample_interval = 60.0 / SAMPLE_FREQUENCY / (100.0 / (m_end_x - m_start_x));
+
+    m_sample_interval = static_cast<double>(SAMPLE_FREQUENCY) / (1000.0 / (m_end_x - m_start_x));
+
+    double time_since_last_sample = current_time - last_sample_time;
+    if (time_since_last_sample > m_sample_interval) {
+        m_x_offset += step_x;
+        last_sample_time = current_time;
+        time_since_last_sample -= m_sample_interval;
     }
+
+    // const int frame_interval_remainder = m_frame_count % m_sample_interval;
+    //
+    // if (!m_paused && frame_interval_remainder == 0) {
+    //     m_x_offset += step_x;
+    // }
 
     // Compute y-values by sampling sin(x) linearly between start_x and end_x
     for (int j = 0; j < num_points; j++) {
         const float t = static_cast<float>(j) / (num_points - 1);
         const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
         const float y = compute_y(sample_x);
-        // m_graph_data[j * 2] = 0.0f;      // x placeholder
         m_graph_data[j * 2 + 1] = y;
     }
 
-    const float smooth_scrolling_x_offset = scroll_progress * screen_dx;
+    // const double scroll_progress = static_cast<double>(frame_interval_remainder) / m_sample_interval;
+    const double scroll_progress = time_since_last_sample / m_sample_interval;
+    const double smooth_scrolling_x_offset = scroll_progress * screen_dx;
 
-    draw_grid(num_points, smooth_scrolling_x_offset);
+    // std::cout << "smooth_scrolling_x_offset: " << smooth_scrolling_x_offset << ", scroll_progress: " << scroll_progress << ", screen_dx: " << screen_dx << std::endl;
 
     // Render each core's line strip
     m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data.data());
-    m_shader->set_uniform("x_offset", smooth_scrolling_x_offset);
+    m_shader->set_uniform("x_offset", static_cast<float>(smooth_scrolling_x_offset));
     m_shader->set_uniform("line_color", GRAPH_COLOUR);
 
     m_shader->begin();
