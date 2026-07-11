@@ -112,6 +112,7 @@ bool SinGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
         if (down) {
             // Start dragging
             m_dragging = true;
+            m_drag_offset = 0.0;
             m_was_paused_before_drag = m_paused;
             if (!m_paused) {
                 set_paused(true);
@@ -119,8 +120,26 @@ bool SinGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
             return true;
         }
         if (m_dragging) {
-            // End dragging — restore previous pause state
+            // End dragging — apply accumulated drag offset to the view window
             m_dragging = false;
+
+            // Convert screen-space NDC drag offset back to data-space
+            const double data_delta = m_drag_offset * (m_end_x - m_start_x) / 2.0;
+            m_start_x += data_delta;
+            m_end_x += data_delta;
+
+            // Recompute y-values at the new sample positions for the shifted window
+            const int num_points = GRAPH_DATA_MAX_POINTS;
+            for (int i = 0; i < num_points; i++) {
+                const double t = static_cast<double>(i) / (num_points - 2);
+                const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+                const double y = compute_y(sample_x);
+                m_graph_data[i * 2 + 1] = static_cast<float>(y);
+            }
+
+            m_drag_offset = 0.0;
+
+            // Restore previous pause state
             set_paused(m_was_paused_before_drag);
             return true;
         }
@@ -133,22 +152,8 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
         if (m_size.x() == 0) {
             return true;
         }
-        // Convert horizontal pixel delta to data-space delta
-        float data_delta = -rel.x() * (m_end_x - m_start_x) / static_cast<float>(m_size.x());
-
-
-        // Shift the view window (pan)
-        m_start_x += data_delta;
-        m_end_x += data_delta;
-
-        // Recompute y-values at the new sample positions for the shifted window
-        const int num_points = GRAPH_DATA_MAX_POINTS;
-        for (int i = 0; i < num_points; i++) {
-            const double t = static_cast<double>(i) / (num_points - 2);
-            const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-            const double y = compute_y(sample_x);
-            m_graph_data[i * 2 + 1] = static_cast<float>(y);
-        }
+        // Accumulate screen-space NDC offset (no data-space changes during drag)
+        m_drag_offset += -rel.x() * 2.0 / static_cast<double>(m_size.x());
 
         return true;
     }
@@ -218,6 +223,9 @@ void SinGraph::draw(NVGcontext *ctx) {
     const double remainder_data = total_scroll - m_x_offset;
     const double smooth_scrolling_x_offset = remainder_data * 2.0 / (m_end_x - m_start_x);
 
+    // Add drag offset so text labels scroll with the graph and grid during drag
+    const double total_x_offset = smooth_scrolling_x_offset + m_drag_offset;
+
     nvgFontSize(ctx, 14.0f);
     nvgFontFace(ctx, "sans");
     nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
@@ -228,7 +236,7 @@ void SinGraph::draw(NVGcontext *ctx) {
         const double t = static_cast<double>(i) / (num_points - 2);
         const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
 
-        const float position_x = m_graph_data[i * 2] - static_cast<float>(smooth_scrolling_x_offset);
+        const float position_x = m_graph_data[i * 2] - static_cast<float>(total_x_offset);
 
         // Convert NDC x (-1..1) to pixel x within the widget
         float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
@@ -283,13 +291,16 @@ void SinGraph::draw_contents() {
     // since the shader offsets the screen-space x-values stored in the buffer.
     const double smooth_scrolling_x_offset = remainder_data * 2.0 / (m_end_x - m_start_x);
 
+    // Add the drag offset so both graph and grid scroll together during drag
+    const double total_x_offset = smooth_scrolling_x_offset + m_drag_offset;
+
     m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data.data());
-    m_shader->set_uniform("x_offset", static_cast<float>(smooth_scrolling_x_offset));
+    m_shader->set_uniform("x_offset", static_cast<float>(total_x_offset));
     m_shader->set_uniform("line_color", GRAPH_COLOUR);
     m_shader->begin();
     m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
     m_shader->end();
 
     // For some reason, this grid gets drawn below the graph line even though we initiate it last
-    draw_grid(num_points, smooth_scrolling_x_offset);
+    draw_grid(num_points, total_x_offset);
 }
