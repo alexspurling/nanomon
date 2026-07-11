@@ -112,7 +112,6 @@ bool SinGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
         if (down) {
             // Start dragging
             m_dragging = true;
-            m_drag_offset = 0.0;
             m_was_paused_before_drag = m_paused;
             if (!m_paused) {
                 set_paused(true);
@@ -120,26 +119,8 @@ bool SinGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
             return true;
         }
         if (m_dragging) {
-            // End dragging — apply accumulated drag offset to the view window
+            // End dragging — keep m_drag_offset, just restore pause state
             m_dragging = false;
-
-            // Convert screen-space NDC drag offset back to data-space
-            const double data_delta = m_drag_offset * (m_end_x - m_start_x) / 2.0;
-            m_start_x += data_delta;
-            m_end_x += data_delta;
-
-            // Recompute y-values at the new sample positions for the shifted window
-            const int num_points = GRAPH_DATA_MAX_POINTS;
-            for (int i = 0; i < num_points; i++) {
-                const double t = static_cast<double>(i) / (num_points - 2);
-                const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-                const double y = compute_y(sample_x);
-                m_graph_data[i * 2 + 1] = static_cast<float>(y);
-            }
-
-            m_drag_offset = 0.0;
-
-            // Restore previous pause state
             set_paused(m_was_paused_before_drag);
             return true;
         }
@@ -152,8 +133,34 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
         if (m_size.x() == 0) {
             return true;
         }
-        // Accumulate screen-space NDC offset (no data-space changes during drag)
+        // Accumulate screen-space NDC offset
         m_drag_offset += -rel.x() * 2.0 / static_cast<double>(m_size.x());
+
+        // Check if accumulated drag exceeds one grid spacing in data-space
+        const int num_points = GRAPH_DATA_MAX_POINTS;
+        const double dx_data = (m_end_x - m_start_x) / (num_points - 2.0);
+        const double data_delta = m_drag_offset * (m_end_x - m_start_x) / 2.0;
+
+        if (std::abs(data_delta) > dx_data) {
+            // Number of whole grid spacings to shift
+            const int num_steps = static_cast<int>(data_delta / dx_data);
+            const double shift = num_steps * dx_data;
+
+            m_start_x += shift;
+            m_end_x += shift;
+
+            // Recompute y-values at the new sample positions for the shifted window
+            for (int i = 0; i < num_points; i++) {
+                const double t = static_cast<double>(i) / (num_points - 2);
+                const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+                const double y = compute_y(sample_x);
+                m_graph_data[i * 2 + 1] = static_cast<float>(y);
+            }
+
+            // Reset m_drag_offset to the remainder (less than one grid spacing)
+            const double remainder_data_delta = data_delta - shift;
+            m_drag_offset = remainder_data_delta * 2.0 / (m_end_x - m_start_x);
+        }
 
         return true;
     }
