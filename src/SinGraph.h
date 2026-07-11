@@ -11,7 +11,7 @@
 using namespace nanogui;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 50;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 20;
 
 class SinGraph : public Canvas {
 public:
@@ -39,7 +39,7 @@ public:
 
     float end_x() const { return m_end_x; }
 
-    float get_speed() {
+    float get_speed() const {
         return m_scroll_speed;
     }
 
@@ -75,11 +75,6 @@ private:
     double m_game_time = 0;
     double m_scroll_speed = 1;
     MouseOverCallback m_mouse_over_callback;
-
-    // This is the number of frames we wait before taking another sample
-    double m_sample_interval;
-    int m_frame_count = 0;
-    double last_sample_time = 0;
 };
 
 #endif //NANOMON_SinGraph_H

@@ -163,40 +163,35 @@ void SinGraph::draw(NVGcontext *ctx) {
     // Let Canvas do its normal OpenGL rendering (including draw_contents)
     Canvas::draw(ctx);
 
-    // const int num_points = GRAPH_DATA_MAX_POINTS;
-    //
-    // nvgFontSize(ctx, 14.0f);
-    // nvgFontFace(ctx, "sans");
-    // nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
-    // nvgFillColor(ctx, m_theme->m_text_color);
+    const int num_points = GRAPH_DATA_MAX_POINTS;
 
-    // distance between points in screen coordinates
-    // (scaled by 1 point so that we always draw the last part of the graph at x >= 1.0)
-    // constexpr float screen_dx = 2.0f / (num_points - 2);
+    // Compute smooth_scrolling_x_offset using the same logic as draw_contents
+    const double total_scroll = m_scroll_speed * m_game_time;
+    const double remainder_data = total_scroll - m_x_offset;
+    const double smooth_scrolling_x_offset = remainder_data * 2.0 / (m_end_x - m_start_x);
 
-    // const float scroll_progress = static_cast<float>(m_frame_count % m_sample_interval) / m_sample_interval;
-    //
-    // for (int i = 0; i < num_points; i++) {
-    //     const float t = static_cast<float>(i) / (num_points - 1);
-    //     const float sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-    //
-    //     const float smooth_scrolling_x_offset = scroll_progress * screen_dx;
-    //     const float position_x = m_graph_data[i * 2] - smooth_scrolling_x_offset;
-    //
-    //     // Convert NDC x (-1..1) to pixel x within the widget
-    //     float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
-    //
-    //     // Pixel y = top of the widget (with small padding)
-    //     float py = m_pos.y() + 4.0f;
-    //
-    //     std::ostringstream oss;
-    //     oss << std::fixed << std::setprecision(2) << sample_x;
-    //     nvgText(ctx, px, py, oss.str().c_str(), nullptr);
-    // }
-    nvgFontSize(ctx, 16.0f);
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(6) << m_sample_interval;
-    nvgText(ctx, 40, 20, oss.str().c_str(), nullptr);
+    nvgFontSize(ctx, 14.0f);
+    nvgFontFace(ctx, "sans");
+    nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    nvgFillColor(ctx, m_theme->m_text_color);
+
+    for (int i = 0; i < num_points; i++) {
+        // Compute sample_x using the same logic as draw_contents
+        const double t = static_cast<double>(i) / (num_points - 2);
+        const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+
+        const float position_x = m_graph_data[i * 2] - static_cast<float>(smooth_scrolling_x_offset);
+
+        // Convert NDC x (-1..1) to pixel x within the widget
+        float px = m_pos.x() + (position_x + 1.0f) * 0.5f * m_size.x();
+
+        // Pixel y = top of the widget (with small padding)
+        float py = m_pos.y() + 4.0f;
+
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(1) << sample_x;
+        nvgText(ctx, px, py, oss.str().c_str(), nullptr);
+    }
 }
 
 void SinGraph::draw_contents() {
@@ -228,8 +223,8 @@ void SinGraph::draw_contents() {
 
         for (int i = 0; i < num_points; i++) {
             const double t = static_cast<double>(i) / (num_points - 2);
-            const double x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
-            const double y = compute_y(x);
+            const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+            const double y = compute_y(sample_x);
             m_graph_data[i * 2 + 1] = static_cast<float>(y);
         }
     }
