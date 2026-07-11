@@ -56,6 +56,10 @@ public:
 
     bool mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
 
+    bool mouse_button_event(const Vector2i &p, int button, bool down, int modifiers) override;
+
+    bool mouse_drag_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
+
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
     static double sample_at(double x);
@@ -71,6 +75,8 @@ private:
     float m_end_x = 10.0f;
     double m_x_offset = 0.0f;
     bool m_paused = true;
+    bool m_dragging = false;
+    bool m_was_paused_before_drag = true;
     double m_last_frame_time = 0;
     double m_game_time = 0;
     double m_scroll_speed = 1;

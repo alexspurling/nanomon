@@ -107,6 +107,54 @@ bool SinGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
     return Canvas::mouse_motion_event(p, rel, button, modifiers);
 }
 
+bool SinGraph::mouse_button_event(const Vector2i &p, int button, bool down, int modifiers) {
+    if (button == 0) {
+        if (down) {
+            // Start dragging
+            m_dragging = true;
+            m_was_paused_before_drag = m_paused;
+            if (!m_paused) {
+                set_paused(true);
+            }
+            return true;
+        }
+        if (m_dragging) {
+            // End dragging — restore previous pause state
+            m_dragging = false;
+            set_paused(m_was_paused_before_drag);
+            return true;
+        }
+    }
+    return Canvas::mouse_button_event(p, button, down, modifiers);
+}
+
+bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
+    if (button == 1 && m_dragging) {
+        if (m_size.x() == 0) {
+            return true;
+        }
+        // Convert horizontal pixel delta to data-space delta
+        float data_delta = -rel.x() * (m_end_x - m_start_x) / static_cast<float>(m_size.x());
+
+
+        // Shift the view window (pan)
+        m_start_x += data_delta;
+        m_end_x += data_delta;
+
+        // Recompute y-values at the new sample positions for the shifted window
+        const int num_points = GRAPH_DATA_MAX_POINTS;
+        for (int i = 0; i < num_points; i++) {
+            const double t = static_cast<double>(i) / (num_points - 2);
+            const double sample_x = m_start_x + m_x_offset + t * (m_end_x - m_start_x);
+            const double y = compute_y(sample_x);
+            m_graph_data[i * 2 + 1] = static_cast<float>(y);
+        }
+
+        return true;
+    }
+    return Canvas::mouse_drag_event(p, rel, button, modifiers);
+}
+
 bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     // calculate the new left and right positions
     float cur_width = m_end_x - m_start_x;
