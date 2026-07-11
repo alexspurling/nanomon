@@ -11,7 +11,7 @@
 using namespace nanogui;
 
 // Maximum number of points to keep in the graph (oldest points are trimmed)
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 50;
 
 class SinGraph : public Canvas {
 public:
@@ -21,7 +21,7 @@ public:
 
     void perform_layout(NVGcontext *ctx) override;
 
-    void draw_grid(int num_points, float x_offset);
+    void draw_grid(int num_points, double smooth_scrolling_x_offset);
 
     void draw(NVGcontext *ctx) override;
 

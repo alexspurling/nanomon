@@ -28,7 +28,7 @@ static constexpr int SAMPLE_WINDOW_SIZE = 2;
 
 static const Vector3f GRAPH_COLOUR = {1.0f, 0.0f, 0.0f};
 
-static const Vector3f GRID_COLOUR = {0.0f, 0.4f, 0.0f};
+static const Vector3f GRID_COLOUR = {0.0f, 0.2f, 0.0f};
 
 SinGraph::SinGraph(Widget *parent)
     : Canvas(parent, 1) {
@@ -139,7 +139,7 @@ double SinGraph::compute_y(const double sample_x) {
     return sine_y;
 }
 
-void SinGraph::draw_grid(const int num_points, const float x_offset) {
+void SinGraph::draw_grid(const int num_points, const double smooth_scrolling_x_offset) {
     // Build a buffer with 2 vertices per vertical grid line (bottom to top)
     std::vector<float> grid_points;
     grid_points.reserve(num_points * 4);
@@ -151,7 +151,7 @@ void SinGraph::draw_grid(const int num_points, const float x_offset) {
         grid_points.push_back(1.0f);
     }
     m_grid_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points * 2), 2 }, grid_points.data());
-    m_grid_shader->set_uniform("x_offset", x_offset);
+    m_grid_shader->set_uniform("x_offset", static_cast<float>(smooth_scrolling_x_offset));
     m_grid_shader->set_uniform("line_color", GRID_COLOUR);
 
     m_grid_shader->begin();
@@ -246,4 +246,7 @@ void SinGraph::draw_contents() {
     m_shader->begin();
     m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
     m_shader->end();
+
+    // For some reason, this grid gets drawn below the graph line even though we initiate it last
+    draw_grid(num_points, smooth_scrolling_x_offset);
 }
