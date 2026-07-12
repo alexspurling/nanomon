@@ -39,7 +39,7 @@ public:
 
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
-    const CoreSample interpolate_sample_at(int core_id, float x) const;
+    CoreSample interpolate_sample_at(int core_id, float x) const;
 
     float compute_core_y(int core_id, float sample_x, int sample_window_size) const;
 

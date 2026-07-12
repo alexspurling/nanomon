@@ -30,15 +30,17 @@ void LineGraph::advance_time(const double game_time) {
     const double quantized_offset = std::floor(total_scroll / dx_data) * dx_data;
 
     if (quantized_offset != m_x_offset) {
+        const double delta = quantized_offset - m_x_offset;
         m_x_offset = quantized_offset;
+        m_start_x += delta;
+        m_end_x += delta;
         recompute_y_values();
     }
 }
 
 void LineGraph::recompute_y_values() {
     for (size_t i = 0; i < m_num_points; i++) {
-        const double t = static_cast<double>(i) / (static_cast<double>(m_num_points) - 2.0);
-        const double sample_x = m_start_x + m_x_offset + t * get_data_width();
+        const double sample_x = get_sample_x(i);
         const double y = compute_y(sample_x);
         m_data[i * 2 + 1] = static_cast<float>(y);
     }
@@ -51,9 +53,9 @@ double LineGraph::get_x_offset() const {
     return smooth_offset + m_drag_offset;
 }
 
-double LineGraph::get_sample_x(const int i) const {
+double LineGraph::get_sample_x(const size_t i) const {
     const double t = static_cast<double>(i) / (static_cast<double>(m_num_points) - 2.0);
-    return m_start_x + m_x_offset + t * get_data_width();
+    return m_start_x + t * get_data_width();
 }
 
 double LineGraph::get_total_scroll() const {

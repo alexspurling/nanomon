@@ -228,7 +228,7 @@ bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     return Canvas::scroll_event(p, rel);
 }
 
-const CoreSample CpuGraph::interpolate_sample_at(const int core_id, const float x) const {
+CoreSample CpuGraph::interpolate_sample_at(const int core_id, const float x) const {
     const int index_a = std::floor(x);
     if (static_cast<float>(index_a) == x) {
         return m_cpu_history.sample_at(core_id, index_a);
@@ -313,6 +313,8 @@ void CpuGraph::draw_contents() {
     for (auto& lg : m_line_graphs) {
         lg.advance_time(m_game_time);
     }
+
+    std::cout << "start_x: " << m_line_graphs[0].start_x() << ", end_x: " << m_line_graphs[0].end_x() << std::endl;
 
     const size_t num_points = m_line_graphs[0].size();
     const auto x_offset = static_cast<float>(m_line_graphs[0].get_x_offset());

@@ -35,7 +35,7 @@ public:
      * current quantized offset and the visible window.
      */
     [[nodiscard]]
-    double get_sample_x(int i) const;
+    double get_sample_x(size_t i) const;
 
     /**
      * Total scroll distance in data-space units since the simulation began.
@@ -64,6 +64,10 @@ public:
     double scroll_speed() const { return m_scroll_speed; }
     void set_scroll_speed(double speed) { m_scroll_speed = speed; }
 
+    /**
+     * The total amount of scroll (in data-space units) that has been
+     * applied to m_start_x and m_end_x so far.
+     */
     [[nodiscard]]
     double x_offset() const { return m_x_offset; }
 
