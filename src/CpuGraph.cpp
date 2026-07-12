@@ -171,6 +171,63 @@ bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
     return Canvas::mouse_motion_event(p, rel, button, modifiers);
 }
 
+bool CpuGraph::mouse_button_event(const Vector2i &p, int button, bool down, int modifiers) {
+    if (button == 0) {
+        if (down) {
+            // Start dragging
+            m_dragging = true;
+            m_was_paused_before_drag = m_paused;
+            if (!m_paused) {
+                set_paused(true);
+            }
+            return true;
+        }
+        if (m_dragging) {
+            // End dragging — keep drag offset, just restore pause state
+            m_dragging = false;
+            set_paused(m_was_paused_before_drag);
+            return true;
+        }
+    }
+    return Canvas::mouse_button_event(p, button, down, modifiers);
+}
+
+bool CpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
+    if (button == 1 && m_dragging) {
+        if (m_size.x() == 0) {
+            return true;
+        }
+        // Delegate to LineGraph — it accumulates and snaps the drag offset
+        for (auto & m_line_graph : m_line_graphs) {
+            m_line_graph.apply_drag_offset(-rel.x() * 2.0 / static_cast<double>(m_size.x()));
+        }
+
+        return true;
+    }
+    return Canvas::mouse_drag_event(p, rel, button, modifiers);
+}
+
+bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
+    // calculate the new left and right positions
+    for (auto & m_line_graph : m_line_graphs) {
+        const double cur_width = m_line_graph.get_data_width();
+        constexpr double scroll_factor = 1.1;
+        double new_width;
+        if (rel.y() < 0) {
+            // zoom out so new width is bigger
+            new_width = cur_width * scroll_factor;
+        } else {
+            new_width = cur_width / scroll_factor;
+        }
+        // Origin around the current cursor position
+        double mouse_x_ratio = static_cast<double>(p.x()) / static_cast<double>(m_size.x());
+        const double mouse_x = m_line_graph.start_x() + cur_width * mouse_x_ratio;
+        m_line_graph.set_start_x(mouse_x - mouse_x_ratio * new_width);
+        m_line_graph.set_end_x(mouse_x + (1.0 - mouse_x_ratio) * new_width);
+    }
+    return Canvas::scroll_event(p, rel);
+}
+
 const CoreSample CpuGraph::interpolate_sample_at(const int core_id, const float x) const {
     const int index_a = std::floor(x);
     if (static_cast<float>(index_a) == x) {

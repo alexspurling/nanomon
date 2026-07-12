@@ -24,14 +24,20 @@ public:
     void draw(NVGcontext *ctx) override;
     void draw_contents() override;
 
-    void set_zoom(float zoom) { m_zoom = zoom; }
-    float zoom() const { return m_zoom; }
+    void set_paused(const bool paused) { m_paused = paused; }
+    bool paused() const { return m_paused; }
 
     void set_mouse_over_callback(const MouseOverCallback &callback) {
         m_mouse_over_callback = callback;
     }
 
     bool mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
+
+    bool mouse_button_event(const Vector2i &p, int button, bool down, int modifiers) override;
+
+    bool mouse_drag_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
+
+    bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
     const CoreSample interpolate_sample_at(int core_id, float x) const;
 
@@ -44,7 +50,9 @@ private:
     ref<Shader> m_grid_shader;
     CpuHistory m_cpu_history;
     std::vector<LineGraph> m_line_graphs;
-    float m_zoom = 1.0f;
+    bool m_paused = true;
+    bool m_dragging = false;
+    bool m_was_paused_before_drag = true;
     MouseOverCallback m_mouse_over_callback;
 
     // This is the number of frames we wait before taking another sample
