@@ -218,7 +218,7 @@ void SinGraph::draw_contents() {
     m_game_time += delta_time;
 
     // Delegate data advancement to LineGraph, passing the computed game time
-    m_line_graph.advance_time(m_game_time);
+    m_line_graph.advance_time(m_game_time, false);
 
     const size_t num_points = m_line_graph.size();
     const double total_x_offset = m_line_graph.get_x_offset();

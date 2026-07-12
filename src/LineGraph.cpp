@@ -22,7 +22,7 @@ void LineGraph::initialise_x_values() {
     }
 }
 
-void LineGraph::advance_time(const double game_time) {
+void LineGraph::advance_time(const double game_time, bool debug) {
     m_game_time = game_time;
 
     const double dx_data = get_data_width() / (static_cast<double>(m_num_points) - 2.0);
@@ -35,6 +35,10 @@ void LineGraph::advance_time(const double game_time) {
         m_start_x += delta;
         m_end_x += delta;
         recompute_y_values();
+    }
+
+    if (debug) {
+        std::cout << "total_scroll: " << total_scroll << ", quantized_offset: " << quantized_offset << ", dx_data: " << dx_data << ", x_offset: " << m_x_offset << ", start_x: " << m_start_x << ", end_x: " << m_end_x << std::endl;
     }
 }
 

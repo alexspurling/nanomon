@@ -15,7 +15,7 @@ public:
      * in the buffer if the quantized scroll offset has changed since the
      * last call.
      */
-    void advance_time(double game_time);
+    void advance_time(double game_time, bool debug);
 
     /**
      * Force a full recomputation of all y-values in the buffer.
