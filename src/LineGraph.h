@@ -24,11 +24,11 @@ public:
     void recompute_y_values();
 
     /**
-     * The smooth sub-step scroll offset in screen (NDC) units,
-     * used by the shader for continuous scrolling between quantized steps.
+     * Combined x offset in NDC units: smooth sub-step scrolling offset
+     * plus any drag offset. Used by the shader for continuous scrolling.
      */
     [[nodiscard]]
-    double get_smooth_scrolling_x_offset() const;
+    double get_x_offset() const;
 
     /**
      * The data-space x value at buffer index i, accounting for the
@@ -74,12 +74,12 @@ public:
     double compute_y(double sample_x) const;
 
     /**
-     * Process a drag offset in NDC units. If the accumulated data-space
-     * delta exceeds one grid spacing, shifts the view window by whole
-     * grid spacings and recomputes y-values. Returns the adjusted drag
-     * offset (remainder less than one grid spacing).
+     * Apply an incremental drag delta (in NDC units). Accumulates the
+     * offset internally. If the accumulated data-space delta exceeds
+     * one grid spacing, shifts the view window by whole grid spacings
+     * and recomputes y-values, keeping only the sub-grid remainder.
      */
-    double drag_to_offset(double drag_offset);
+    void apply_drag_offset(double delta_ndc);
 
 private:
     void initialise_x_values();
@@ -91,6 +91,7 @@ private:
     double m_start_x = 0.0;
     double m_end_x = 10.0;
     double m_game_time = 0.0;
+    double m_drag_offset = 0.0;
     size_t m_num_points;
 };
 

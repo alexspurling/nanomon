@@ -112,7 +112,7 @@ bool SinGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
             return true;
         }
         if (m_dragging) {
-            // End dragging — keep m_drag_offset, just restore pause state
+            // End dragging — keep drag offset, just restore pause state
             m_dragging = false;
             set_paused(m_was_paused_before_drag);
             return true;
@@ -126,11 +126,8 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
         if (m_size.x() == 0) {
             return true;
         }
-        // Accumulate screen-space NDC offset
-        m_drag_offset += -rel.x() * 2.0 / static_cast<double>(m_size.x());
-
-        // Delegate snapping logic to LineGraph
-        m_drag_offset = m_line_graph.drag_to_offset(m_drag_offset);
+        // Delegate to LineGraph — it accumulates and snaps the drag offset
+        m_line_graph.apply_drag_offset(-rel.x() * 2.0 / static_cast<double>(m_size.x()));
 
         return true;
     }
@@ -186,11 +183,8 @@ void SinGraph::draw(NVGcontext *ctx) {
 
     const size_t num_points = m_line_graph.size();
 
-    // Get smooth_scrolling_x_offset from LineGraph
-    const double smooth_scrolling_x_offset = m_line_graph.get_smooth_scrolling_x_offset();
-
-    // Add drag offset so text labels scroll with the graph and grid during drag
-    const double total_x_offset = smooth_scrolling_x_offset + m_drag_offset;
+    // Get combined x offset from LineGraph
+    const double total_x_offset = m_line_graph.get_x_offset();
 
     nvgFontSize(ctx, 14.0f);
     nvgFontFace(ctx, "sans");
@@ -227,10 +221,7 @@ void SinGraph::draw_contents() {
     m_line_graph.advance_time(m_game_time);
 
     const size_t num_points = m_line_graph.size();
-    const double smooth_scrolling_x_offset = m_line_graph.get_smooth_scrolling_x_offset();
-
-    // Add the drag offset so both graph and grid scroll together during drag
-    const double total_x_offset = smooth_scrolling_x_offset + m_drag_offset;
+    const double total_x_offset = m_line_graph.get_x_offset();
 
     m_shader->set_buffer("points", VariableType::Float32, { num_points, 2 }, m_line_graph.data());
     m_shader->set_uniform("x_offset", static_cast<float>(total_x_offset));

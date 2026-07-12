@@ -44,10 +44,11 @@ void LineGraph::recompute_y_values() {
     }
 }
 
-double LineGraph::get_smooth_scrolling_x_offset() const {
+double LineGraph::get_x_offset() const {
     const double total_scroll = m_scroll_speed * m_game_time;
     const double remainder_data = total_scroll - m_x_offset;
-    return remainder_data * 2.0 / get_data_width();
+    const double smooth_offset = remainder_data * 2.0 / get_data_width();
+    return smooth_offset + m_drag_offset;
 }
 
 double LineGraph::get_sample_x(const int i) const {
@@ -64,9 +65,11 @@ double LineGraph::compute_y(const double sample_x) const {
     return m_value_func(sample_x) * 2.0 - 1.0;
 }
 
-double LineGraph::drag_to_offset(const double drag_offset) {
+void LineGraph::apply_drag_offset(const double delta_ndc) {
+    m_drag_offset += delta_ndc;
+
     const double dx_data = get_data_width() / (static_cast<double>(m_num_points) - 2.0);
-    const double data_delta = drag_offset * get_data_width() / 2.0;
+    const double data_delta = m_drag_offset * get_data_width() / 2.0;
 
     if (std::abs(data_delta) > dx_data) {
         // Number of whole grid spacings to shift
@@ -79,10 +82,9 @@ double LineGraph::drag_to_offset(const double drag_offset) {
         // Recompute y-values at the new sample positions for the shifted window
         recompute_y_values();
 
-        // Return the remainder (less than one grid spacing) as the new drag offset
+        // Keep only the sub-grid remainder as the drag offset
         const double remainder_data_delta = data_delta - shift;
-        return remainder_data_delta * 2.0 / get_data_width();
+        m_drag_offset = remainder_data_delta * 2.0 / get_data_width();
     }
-
-    return drag_offset;
 }
+

@@ -64,7 +64,6 @@ private:
     bool m_paused = true;
     bool m_dragging = false;
     bool m_was_paused_before_drag = true;
-    double m_drag_offset = 0.0;
     double m_last_frame_time = 0;
     double m_game_time = 0;
     MouseOverCallback m_mouse_over_callback;
