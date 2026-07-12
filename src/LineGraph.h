@@ -15,7 +15,7 @@ public:
      * in the buffer if the quantized scroll offset has changed since the
      * last call.
      */
-    void advance_time(double game_time, bool debug);
+    void advance_time(double game_time);
 
     /**
      * Force a full recomputation of all y-values in the buffer.
@@ -65,11 +65,12 @@ public:
     void set_scroll_speed(double speed) { m_scroll_speed = speed; }
 
     /**
-     * The total amount of scroll (in data-space units) that has been
-     * applied to m_start_x and m_end_x so far.
+     * The smooth scrolling remainder offset, always less than one grid
+     * spacing (dx_data). This is the sub-grid portion of the total
+     * scroll that hasn't yet been quantized into m_start_x/m_end_x.
      */
     [[nodiscard]]
-    double x_offset() const { return m_x_offset; }
+    double x_offset() const { return m_smooth_offset; }
 
     [[nodiscard]]
     size_t num_points() const { return m_num_points; }
@@ -90,7 +91,8 @@ private:
 
     std::function<double(double)> m_value_func;
     std::vector<float> m_data;
-    double m_x_offset = 0.0;
+    double m_smooth_offset = 0.0;
+    double m_last_quantized = 0.0;
     double m_scroll_speed = 1.0;
     double m_start_x = 0.0;
     double m_end_x = 10.0;

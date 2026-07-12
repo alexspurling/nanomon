@@ -310,8 +310,8 @@ void CpuGraph::draw_contents() {
     }
 
     // Advance all LineGraphs with the current game time
-    for (int i = 0; i < m_line_graphs.size(); i++) {
-        m_line_graphs[i].advance_time(m_game_time, i == 0);
+    for (auto & line_graph : m_line_graphs) {
+        line_graph.advance_time(m_game_time);
     }
 
     // std::cout << "start_x: " << m_line_graphs[0].start_x() << ", end_x: " << m_line_graphs[0].end_x() << std::endl;
