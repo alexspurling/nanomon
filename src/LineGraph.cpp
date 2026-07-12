@@ -71,3 +71,26 @@ double LineGraph::compute_y(double sample_x) const {
     // value_func returns in range 0.0..1.0, convert to -1.0..1.0
     return m_value_func(sample_x) * 2.0 - 1.0;
 }
+
+double LineGraph::drag_to_offset(double drag_offset) {
+    const double dx_data = get_data_width() / (static_cast<double>(m_num_points) - 2.0);
+    const double data_delta = drag_offset * get_data_width() / 2.0;
+
+    if (std::abs(data_delta) > dx_data) {
+        // Number of whole grid spacings to shift
+        const int num_steps = static_cast<int>(data_delta / dx_data);
+        const double shift = num_steps * dx_data;
+
+        m_start_x += shift;
+        m_end_x += shift;
+
+        // Recompute y-values at the new sample positions for the shifted window
+        recompute_y_values();
+
+        // Return the remainder (less than one grid spacing) as the new drag offset
+        const double remainder_data_delta = data_delta - shift;
+        return remainder_data_delta * 2.0 / get_data_width();
+    }
+
+    return drag_offset;
+}

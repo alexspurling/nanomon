@@ -129,26 +129,8 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
         // Accumulate screen-space NDC offset
         m_drag_offset += -rel.x() * 2.0 / static_cast<double>(m_size.x());
 
-        // Check if accumulated drag exceeds one grid spacing in data-space
-        const int num_points = static_cast<int>(m_line_graph.size());
-        const double dx_data = m_line_graph.get_data_width() / (num_points - 2.0);
-        const double data_delta = m_drag_offset * m_line_graph.get_data_width() / 2.0;
-
-        if (std::abs(data_delta) > dx_data) {
-            // Number of whole grid spacings to shift
-            const int num_steps = static_cast<int>(data_delta / dx_data);
-            const double shift = num_steps * dx_data;
-
-            m_line_graph.set_start_x(m_line_graph.start_x() + shift);
-            m_line_graph.set_end_x(m_line_graph.end_x() + shift);
-
-            // Recompute y-values at the new sample positions for the shifted window
-            m_line_graph.recompute_y_values();
-
-            // Reset m_drag_offset to the remainder (less than one grid spacing)
-            const double remainder_data_delta = data_delta - shift;
-            m_drag_offset = remainder_data_delta * 2.0 / m_line_graph.get_data_width();
-        }
+        // Delegate snapping logic to LineGraph
+        m_drag_offset = m_line_graph.drag_to_offset(m_drag_offset);
 
         return true;
     }
@@ -157,7 +139,7 @@ bool SinGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
 
 bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     // calculate the new left and right positions
-    double cur_width = m_line_graph.get_data_width();
+    const double cur_width = m_line_graph.get_data_width();
     constexpr double scroll_factor = 1.1;
     double new_width;
     if (rel.y() < 0) {

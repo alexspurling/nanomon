@@ -62,6 +62,14 @@ public:
 
     double compute_y(double sample_x) const;
 
+    /**
+     * Process a drag offset in NDC units. If the accumulated data-space
+     * delta exceeds one grid spacing, shifts the view window by whole
+     * grid spacings and recomputes y-values. Returns the adjusted drag
+     * offset (remainder less than one grid spacing).
+     */
+    double drag_to_offset(double drag_offset);
+
 private:
     void initialise_x_values();
 
