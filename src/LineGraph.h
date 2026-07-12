@@ -8,8 +8,7 @@
 class LineGraph {
 public:
 
-    explicit LineGraph(size_t num_points,
-                     std::function<double(double)> value_func);
+    explicit LineGraph(size_t num_points, std::function<double(double)> value_func);
 
     /**
      * Advance the simulation to the given game_time. Recomputes y-values
@@ -28,38 +27,50 @@ public:
      * The smooth sub-step scroll offset in screen (NDC) units,
      * used by the shader for continuous scrolling between quantized steps.
      */
+    [[nodiscard]]
     double get_smooth_scrolling_x_offset() const;
 
     /**
      * The data-space x value at buffer index i, accounting for the
      * current quantized offset and the visible window.
      */
+    [[nodiscard]]
     double get_sample_x(int i) const;
 
     /**
      * Total scroll distance in data-space units since the simulation began.
      */
+    [[nodiscard]]
     double get_total_scroll() const;
 
     /** Raw access to the interleaved x/y buffer for rendering. */
+    [[nodiscard]]
     const float* data() const { return m_data.data(); }
 
     /** Number of points in the buffer. */
+    [[nodiscard]]
     size_t size() const;
 
+    [[nodiscard]]
     double start_x() const { return m_start_x; }
+    [[nodiscard]]
     double end_x() const { return m_end_x; }
+    [[nodiscard]]
     double get_data_width() const { return m_end_x - m_start_x; }
     void set_start_x(double x) { m_start_x = x; }
     void set_end_x(double x) { m_end_x = x; }
 
+    [[nodiscard]]
     double scroll_speed() const { return m_scroll_speed; }
     void set_scroll_speed(double speed) { m_scroll_speed = speed; }
 
+    [[nodiscard]]
     double x_offset() const { return m_x_offset; }
 
+    [[nodiscard]]
     size_t num_points() const { return m_num_points; }
 
+    [[nodiscard]]
     double compute_y(double sample_x) const;
 
     /**
