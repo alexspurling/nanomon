@@ -18,7 +18,7 @@ using nanogui::Shader;
 
 constexpr float Pi = 3.14159f;
 
-// Maximum number of points to keep in the graph (oldest points are trimmed)
+// Number of samples of the underlying data to take when displaying as a graph
 static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
 
 // How many times per second we want to sample
@@ -96,12 +96,12 @@ CpuGraph::CpuGraph(Widget *parent)
     m_line_graphs.reserve(num_cores);
     for (size_t core_id = 0; core_id < num_cores; core_id++) {
         m_line_graphs.emplace_back(
-            200,
+            GRAPH_DATA_MAX_POINTS,
             [this, core_id](double sample_x) -> double {
                 // sample_x is the data-space x, which corresponds to a sample index
                 const int num_samples = m_cpu_history.num_samples();
                 // Clamp to valid range; return 0.0 for out-of-range
-                if (sample_x < SAMPLE_WINDOW_SIZE || sample_x >= num_samples - 1) {
+                if (sample_x < SAMPLE_WINDOW_SIZE || sample_x > num_samples - 1) {
                     return 0.0;
                 }
                 const float y = compute_core_y(
@@ -112,9 +112,9 @@ CpuGraph::CpuGraph(Widget *parent)
                 return (y + 1.0) / 2.0;
             }
         );
-        // Set the data window so that sample_x corresponds to sample indices
-        m_line_graphs.back().set_start_x(0.0);
-        m_line_graphs.back().set_end_x(static_cast<double>(GRAPH_DATA_MAX_POINTS - 2));
+        // Initialise the window to put the first elements to the right of the graph
+        m_line_graphs.back().set_start_x(0.0-GRAPH_DATA_MAX_POINTS);
+        m_line_graphs.back().set_end_x(-2.0);
     }
 
     // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
@@ -298,7 +298,7 @@ void CpuGraph::draw_contents() {
     if (frame_interval_remainder == 0) {
         // TODO Remove timestamp?
         const Timestamp now = std::chrono::system_clock::now();
-        std::cout << "cpu sample at: " << now << std::endl;
+        std::cout << "cpu sample at: " << now << ", game_time: " << m_game_time << std::endl;
         m_cpu_history.sample(now);
     }
 
@@ -306,7 +306,6 @@ void CpuGraph::draw_contents() {
 
     const int num_samples = m_cpu_history.num_samples();
     if (num_samples < SAMPLE_WINDOW_SIZE + 1) {
-        std::cout << "not enough samples yet: " << num_samples << std::endl;
         return;
     }
 
