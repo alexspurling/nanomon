@@ -10,6 +10,7 @@
 #include <nanogui/theme.h>
 
 #include "CpuHistory.h"
+#include "LineGraph.h"
 
 using namespace nanogui;
 
@@ -36,17 +37,19 @@ public:
 
     float compute_core_y(int core_id, float sample_x, int sample_window_size) const;
 
+    void draw_grid(size_t num_points, float x_offset);
+
 private:
     ref<Shader> m_shader;
     ref<Shader> m_grid_shader;
     CpuHistory m_cpu_history;
-    std::vector<std::vector<float>> m_graph_data;
-    Timestamp m_last_sample_time;
+    std::vector<LineGraph> m_line_graphs;
     float m_zoom = 1.0f;
     MouseOverCallback m_mouse_over_callback;
 
     // This is the number of frames we wait before taking another sample
     int m_sample_interval;
+    double m_game_time = 0.0;
 };
 
 #endif //NANOMON_CPUGRAPH_H

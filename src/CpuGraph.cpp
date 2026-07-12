@@ -1,6 +1,7 @@
 #include "CpuGraph.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <ostream>
 #include <sstream>
@@ -53,8 +54,9 @@ CpuGraph::CpuGraph(Widget *parent)
         // Vertex shader
         R"(#version 330
         in vec2 points;
+        uniform float x_offset;
         void main() {
-            gl_Position = vec4(points.x, points.y, 0.0, 1.0);
+            gl_Position = vec4(points.x - x_offset, points.y, 0.0, 1.0);
         })",
         // Fragment shader
         R"(#version 330
@@ -71,8 +73,9 @@ CpuGraph::CpuGraph(Widget *parent)
         // Vertex shader
         R"(#version 330
         in vec2 points;
+        uniform float x_offset;
         void main() {
-            gl_Position = vec4(points.x, points.y, 0.0, 1.0);
+            gl_Position = vec4(points.x - x_offset, points.y, 0.0, 1.0);
         })",
         // Fragment shader
         R"(#version 330
@@ -83,13 +86,35 @@ CpuGraph::CpuGraph(Widget *parent)
         })"
     );
 
-    // Pre-allocate graph data: determine number of cores from the sampler
+    // Determine number of cores from the sampler
     CpuTimesSampler sampler;
     auto stat = sampler.sample();
     size_t num_cores = stat.size();
-    m_graph_data.resize(num_cores);
-    for (auto& core_data : m_graph_data) {
-        core_data.resize(GRAPH_DATA_MAX_POINTS * 2, 0.0f);
+
+    // Create one LineGraph per core with a value_func lambda that interpolates
+    // sample data for the corresponding core_id
+    m_line_graphs.reserve(num_cores);
+    for (size_t core_id = 0; core_id < num_cores; core_id++) {
+        m_line_graphs.emplace_back(
+            200,
+            [this, core_id](double sample_x) -> double {
+                // sample_x is the data-space x, which corresponds to a sample index
+                const int num_samples = m_cpu_history.num_samples();
+                // Clamp to valid range; return 0.0 for out-of-range
+                if (sample_x < SAMPLE_WINDOW_SIZE || sample_x >= num_samples - 1) {
+                    return 0.0;
+                }
+                const float y = compute_core_y(
+                    static_cast<int>(core_id),
+                    static_cast<float>(sample_x),
+                    SAMPLE_WINDOW_SIZE);
+                // compute_core_y returns -1..1, convert to 0..1 for LineGraph
+                return (y + 1.0) / 2.0;
+            }
+        );
+        // Set the data window so that sample_x corresponds to sample indices
+        m_line_graphs.back().set_start_x(0.0);
+        m_line_graphs.back().set_end_x(static_cast<double>(GRAPH_DATA_MAX_POINTS - 2));
     }
 
     // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
@@ -110,35 +135,31 @@ void CpuGraph::draw(NVGcontext *ctx) {
     Canvas::draw(ctx);
 
     // Now overlay grid line labels using NanoVG
-    if (!m_graph_data.empty()) {
-        const int num_samples = m_cpu_history.num_samples();
-        const int num_points = std::min(num_samples - SAMPLE_WINDOW_SIZE,
-                                        static_cast<int>(GRAPH_DATA_MAX_POINTS));
-        if (num_points > 0) {
-            nvgFontSize(ctx, 14.0f);
-            nvgFontFace(ctx, "sans");
-            nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
-            nvgFillColor(ctx, m_theme->m_text_color);
-
-            constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
-            const float scroll_progress = static_cast<float>(frame_count % m_sample_interval) / m_sample_interval;
-            const float scroll_offset = scroll_progress * dx;
-
-            for (int i = 0; i < num_points; i++) {
-                float ndc_x = 1.0f + dx - static_cast<float>(num_points - 1 - i) * dx - scroll_offset;
-
-                // Convert NDC x (-1..1) to pixel x within the widget
-                float px = m_pos.x() + (ndc_x + 1.0f) * 0.5f * m_size.x();
-
-                // Pixel y = top of the widget (with small padding)
-                float py = m_pos.y() + 4.0f;
-
-                std::ostringstream oss;
-                oss << std::fixed << std::setprecision(2) << ndc_x;
-                nvgText(ctx, px, py, oss.str().c_str(), nullptr);
-            }
-        }
-    }
+    // if (!m_line_graphs.empty()) {
+    //     const size_t num_points = m_line_graphs[0].size();
+    //     if (num_points > 0) {
+    //         nvgFontSize(ctx, 14.0f);
+    //         nvgFontFace(ctx, "sans");
+    //         nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    //         nvgFillColor(ctx, m_theme->m_text_color);
+    //
+    //         const double x_offset = m_line_graphs[0].get_x_offset();
+    //
+    //         for (size_t i = 0; i < num_points; i++) {
+    //             const float ndc_x = m_line_graphs[0].data()[i * 2] - static_cast<float>(x_offset);
+    //
+    //             // Convert NDC x (-1..1) to pixel x within the widget
+    //             float px = m_pos.x() + (ndc_x + 1.0f) * 0.5f * m_size.x();
+    //
+    //             // Pixel y = top of the widget (with small padding)
+    //             float py = m_pos.y() + 4.0f;
+    //
+    //             std::ostringstream oss;
+    //             oss << std::fixed << std::setprecision(2) << m_line_graphs[0].get_sample_x(static_cast<int>(i));
+    //             nvgText(ctx, px, py, oss.str().c_str(), nullptr);
+    //         }
+    //     }
+    // }
 }
 
 bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
@@ -151,7 +172,7 @@ bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int bu
 }
 
 const CoreSample CpuGraph::interpolate_sample_at(const int core_id, const float x) const {
-    const int index_a = floor(x);
+    const int index_a = std::floor(x);
     if (static_cast<float>(index_a) == x) {
         return m_cpu_history.sample_at(core_id, index_a);
     }
@@ -179,7 +200,7 @@ float CpuGraph::compute_core_y(const int core_id, const float sample_x, const in
     const double cpu_idle_diff = curr.idle_time - prev.idle_time;
 
     if (cpu_idle_diff > cpu_total_diff) {
-        std::cout << "cpu idle diff is greater than total diff" << std::endl;
+        std::cout << "cpu idle diff is greater than total diff. Core id: " << core_id << ", idle diff: " << cpu_idle_diff << ", total diff: " << cpu_total_diff << std::endl;
     }
 
     float core_usage = 0.0f;
@@ -189,73 +210,67 @@ float CpuGraph::compute_core_y(const int core_id, const float sample_x, const in
     return 2.0f * core_usage - 1.0f;
 }
 
+void CpuGraph::draw_grid(size_t num_points, float x_offset) {
+
+    // Build a buffer with 2 vertices per vertical grid line (bottom to top)
+    std::vector<float> grid_points;
+    grid_points.reserve(num_points * 4);
+    for (size_t i = 0; i < num_points; i++) {
+        const float x = m_line_graphs[0].data()[i * 2];
+        grid_points.push_back(x);
+        grid_points.push_back(-1.0f);
+        grid_points.push_back(x);
+        grid_points.push_back(1.0f);
+    }
+    m_grid_shader->set_buffer("points", VariableType::Float32, { num_points * 2, 2 }, grid_points.data());
+    m_grid_shader->set_uniform("x_offset", static_cast<float>(x_offset));
+    m_grid_shader->set_uniform("line_color", GRID_COLOUR);
+
+    m_grid_shader->begin();
+    m_grid_shader->draw_array(Shader::PrimitiveType::Line, 0, num_points * 2, false);
+    m_grid_shader->end();
+}
+
 void CpuGraph::draw_contents() {
     using namespace nanogui;
+
+    // Advance game time
+    m_game_time += 1.0 / 60.0; // one frame step
 
     const int frame_interval_remainder = frame_count % m_sample_interval;
     if (frame_interval_remainder == 0) {
         // TODO Remove timestamp?
         const Timestamp now = std::chrono::system_clock::now();
+        std::cout << "cpu sample at: " << now << std::endl;
         m_cpu_history.sample(now);
     }
 
     frame_count++;
 
     const int num_samples = m_cpu_history.num_samples();
-    // Rebuild m_graph_data from scratch using all samples from m_cpu_history
-    const int num_points = std::min(num_samples - SAMPLE_WINDOW_SIZE, static_cast<int>(GRAPH_DATA_MAX_POINTS));
+    if (num_samples < SAMPLE_WINDOW_SIZE + 1) {
+        std::cout << "not enough samples yet: " << num_samples << std::endl;
+        return;
+    }
 
-    if (num_points > 0) {
-        const int first_sample_idx = num_samples - num_points;
+    // Advance all LineGraphs with the current game time
+    for (auto& lg : m_line_graphs) {
+        lg.advance_time(m_game_time);
+    }
 
-        for (int core_id = 0; core_id < static_cast<int>(m_graph_data.size()); core_id++) {
-            for (int j = 0; j < num_points; j++) {
-                const float y = compute_core_y(core_id, first_sample_idx + j, SAMPLE_WINDOW_SIZE);
-                m_graph_data[core_id][j * 2] = 0.0f;      // x placeholder
-                m_graph_data[core_id][j * 2 + 1] = y;
-            }
-        }
+    const size_t num_points = m_line_graphs[0].size();
+    const auto x_offset = static_cast<float>(m_line_graphs[0].get_x_offset());
 
-        // Compute smooth scroll offset based on time since last sample
-        const float scroll_progress = static_cast<float>(frame_interval_remainder) / m_sample_interval;
-        // The number of points shown on the screen is actually n - 2 because we need a buffer at the left and right boundaries
-        constexpr float dx = 2.0f / static_cast<float>(GRAPH_DATA_MAX_POINTS - 2);
-        const float scroll_offset = scroll_progress * dx;
+    // draw_grid(num_points, x_offset);
 
-        // Update x-values for all cores every frame (smooth scrolling)
-        for (int core_id = 0; core_id < static_cast<int>(m_graph_data.size()); core_id++) {
-            for (int i = 0; i < num_points; i++) {
-                // By adding dx here we will draw the last point off the screen at x=1, which ensures smooth animation
-                const float x = 1.0f + dx - static_cast<float>(num_points - 1 - i) * dx - scroll_offset;
-                m_graph_data[core_id][i * 2] = x;
-            }
-        }
+    // Render each core's line strip
+    for (size_t i = 0; i < m_line_graphs.size(); i++) {
+        m_shader->set_buffer("points", VariableType::Float32, { num_points, 2 }, m_line_graphs[i].data());
+        m_shader->set_uniform("x_offset", x_offset);
+        m_shader->set_uniform("line_color", core_colours[i % num_colours]);
 
-        // Build a buffer with 2 vertices per vertical grid line (bottom to top)
-        std::vector<float> grid_points;
-        grid_points.reserve(num_points * 4);
-        for (int i = 0; i < num_points; i++) {
-            float x = m_graph_data[0][i * 2];
-            grid_points.push_back(x);
-            grid_points.push_back(-1.0f);
-            grid_points.push_back(x);
-            grid_points.push_back(1.0f);
-        }
-        m_grid_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points * 2), 2 }, grid_points.data());
-        m_grid_shader->set_uniform("line_color", GRID_COLOUR);
-
-        m_grid_shader->begin();
-        m_grid_shader->draw_array(Shader::PrimitiveType::Line, 0, num_points * 2, false);
-        m_grid_shader->end();
-
-        // Render each core's line strip
-        for (int i = 0; i < static_cast<int>(m_graph_data.size()); i++) {
-            m_shader->set_buffer("points", VariableType::Float32, { static_cast<size_t>(num_points), 2 }, m_graph_data[i].data());
-            m_shader->set_uniform("line_color", core_colours[i % num_colours]);
-
-            m_shader->begin();
-            m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
-            m_shader->end();
-        }
+        m_shader->begin();
+        m_shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_points, false);
+        m_shader->end();
     }
 }
