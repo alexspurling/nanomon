@@ -50,7 +50,7 @@ private:
     ref<Shader> m_grid_shader;
     CpuHistory m_cpu_history;
     std::vector<LineGraph> m_line_graphs;
-    bool m_paused = true;
+    bool m_paused = false;
     bool m_dragging = false;
     bool m_was_paused_before_drag = true;
     MouseOverCallback m_mouse_over_callback;

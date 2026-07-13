@@ -113,8 +113,7 @@ CpuGraph::CpuGraph(Widget *parent)
             }
         );
         // Initialise the window to put the first elements to the right of the graph
-        m_line_graphs.back().set_start_x(0.0-GRAPH_DATA_MAX_POINTS);
-        m_line_graphs.back().set_end_x(-2.0);
+        m_line_graphs.back().set_start_and_end_x(0.0-GRAPH_DATA_MAX_POINTS, -2.0);
     }
 
     // Calculate the number of frames we wait between each sample based on the monitor's refresh rate
@@ -222,8 +221,9 @@ bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
         // Origin around the current cursor position
         double mouse_x_ratio = static_cast<double>(p.x()) / static_cast<double>(m_size.x());
         const double mouse_x = m_line_graph.start_x() + cur_width * mouse_x_ratio;
-        m_line_graph.set_start_x(mouse_x - mouse_x_ratio * new_width);
-        m_line_graph.set_end_x(mouse_x + (1.0 - mouse_x_ratio) * new_width);
+        m_line_graph.set_start_and_end_x(
+            mouse_x - mouse_x_ratio * new_width,
+            mouse_x + (1.0 - mouse_x_ratio) * new_width);
     }
     return Canvas::scroll_event(p, rel);
 }
@@ -291,8 +291,10 @@ void CpuGraph::draw_grid(size_t num_points, float x_offset) {
 void CpuGraph::draw_contents() {
     using namespace nanogui;
 
-    // Advance game time
-    m_game_time += 1.0 / 60.0; // one frame step
+    // Advance game time (paused when dragging or explicitly paused)
+    if (!m_paused) {
+        m_game_time += 1.0 / 60.0; // one frame step
+    }
 
     const int frame_interval_remainder = frame_count % m_sample_interval;
     if (frame_interval_remainder == 0) {

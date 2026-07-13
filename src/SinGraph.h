@@ -26,11 +26,9 @@ public:
 
     void draw_contents() override;
 
-    void set_start_x(float x) { m_line_graph.set_start_x(x); }
+    void set_start_and_end_x(float start, float end) { m_line_graph.set_start_and_end_x(start, end); }
 
     float start_x() const { return static_cast<float>(m_line_graph.start_x()); }
-
-    void set_end_x(float x) { m_line_graph.set_end_x(x); }
 
     float end_x() const { return static_cast<float>(m_line_graph.end_x()); }
 

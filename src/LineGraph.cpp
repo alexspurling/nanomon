@@ -40,6 +40,7 @@ void LineGraph::advance_time(const double game_time) {
     // Smooth scrolling offset: sub-grid remainder in NDC units
     const double remainder_data = total_scroll - m_last_quantized;
     m_smooth_offset = remainder_data * 2.0 / get_data_width();
+    // std::cout << "total scroll: " << total_scroll << ", new smooth offset " << m_smooth_offset << std::endl;
 }
 
 void LineGraph::recompute_y_values() {
@@ -59,8 +60,17 @@ double LineGraph::get_sample_x(const size_t i) const {
     return m_start_x + t * get_data_width();
 }
 
-double LineGraph::get_total_scroll() const {
-    return m_scroll_speed * m_game_time;
+void LineGraph::set_start_and_end_x(const double start, const double end) {
+    const double total_scroll = m_scroll_speed * m_game_time - 2.0;
+    double adjusted_end = end;
+    double adjusted_start = start;
+    if (adjusted_end > total_scroll) {
+        const double delta = adjusted_end - total_scroll;
+        adjusted_end = total_scroll;
+        adjusted_start -= delta;
+    }
+    m_start_x = adjusted_start;
+    m_end_x = adjusted_end;
 }
 
 double LineGraph::compute_y(const double sample_x) const {
@@ -71,23 +81,33 @@ double LineGraph::compute_y(const double sample_x) const {
 void LineGraph::apply_drag_offset(const double delta_ndc) {
     m_drag_offset += delta_ndc;
 
+    // One grid spacing in data-space and NDC units
     const double dx_data = get_data_width() / (static_cast<double>(m_num_points) - 2.0);
-    const double data_delta = m_drag_offset * get_data_width() / 2.0;
+    const double dx_ndc = dx_data * 2.0 / get_data_width();
 
-    if (std::abs(data_delta) > dx_data) {
-        // Number of whole grid spacings to shift
-        const int num_steps = static_cast<int>(data_delta / dx_data);
+    // Snap to grid when accumulated drag offset exceeds one grid spacing
+    if (m_drag_offset >= dx_ndc) {
+        const int num_steps = static_cast<int>(m_drag_offset / dx_ndc);
         const double shift = num_steps * dx_data;
-
         m_start_x += shift;
         m_end_x += shift;
-
-        // Recompute y-values at the new sample positions for the shifted window
+        m_drag_offset -= num_steps * dx_ndc;
         recompute_y_values();
+    } else if (m_drag_offset <= -dx_ndc) {
+        const int num_steps = static_cast<int>((-m_drag_offset) / dx_ndc);
+        const double shift = num_steps * dx_data;
+        m_start_x -= shift;
+        m_end_x -= shift;
+        m_drag_offset += num_steps * dx_ndc;
+        recompute_y_values();
+    }
 
-        // Keep only the sub-grid remainder as the drag offset
-        const double remainder_data_delta = data_delta - shift;
-        m_drag_offset = remainder_data_delta * 2.0 / get_data_width();
+    // Cap: rightmost visible point shouldn't exceed total_scroll.
+    // Rightmost visible data x = m_end_x + (m_smooth_offset + m_drag_offset) * data_width / 2
+    const double total_scroll = m_scroll_speed * m_game_time - 2.0;
+    const double max_drag_offset = (total_scroll - m_end_x) * 2.0 / get_data_width() - m_smooth_offset;
+    if (m_drag_offset > max_drag_offset) {
+        m_drag_offset = max_drag_offset;
     }
 }
 

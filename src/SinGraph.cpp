@@ -148,8 +148,7 @@ bool SinGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     // Origin around the current cursor position
     double mouse_x_ratio = static_cast<double>(p.x()) / static_cast<double>(m_size.x());
     const double mouse_x = m_line_graph.start_x() + cur_width * mouse_x_ratio;
-    m_line_graph.set_start_x(mouse_x - mouse_x_ratio * new_width);
-    m_line_graph.set_end_x(mouse_x + (1.0 - mouse_x_ratio) * new_width);
+    m_line_graph.set_start_and_end_x(mouse_x - mouse_x_ratio * new_width, mouse_x + (1.0 - mouse_x_ratio) * new_width);
 
     std::cout << "new start_x: " << m_line_graph.start_x() << ", end_x: " << m_line_graph.end_x() << std::endl;
 

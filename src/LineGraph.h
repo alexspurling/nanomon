@@ -37,12 +37,6 @@ public:
     [[nodiscard]]
     double get_sample_x(size_t i) const;
 
-    /**
-     * Total scroll distance in data-space units since the simulation began.
-     */
-    [[nodiscard]]
-    double get_total_scroll() const;
-
     /** Raw access to the interleaved x/y buffer for rendering. */
     [[nodiscard]]
     const float* data() const { return m_data.data(); }
@@ -57,8 +51,7 @@ public:
     double end_x() const { return m_end_x; }
     [[nodiscard]]
     double get_data_width() const { return m_end_x - m_start_x; }
-    void set_start_x(double x) { m_start_x = x; }
-    void set_end_x(double x) { m_end_x = x; }
+    void set_start_and_end_x(double start, double end);
 
     [[nodiscard]]
     double scroll_speed() const { return m_scroll_speed; }
