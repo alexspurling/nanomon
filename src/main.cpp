@@ -20,6 +20,7 @@
 #include <stb_image.h>
 
 #include "CpuGraph.h"
+#include "BetterCpuGraph.h"
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
 #include "SinGraph.h"
@@ -60,7 +61,7 @@ public:
 
         Widget *cpu_graph_container2 = new Widget(this);
         cpu_graph_container2->set_fixed_height(250);
-        CpuGraph *cpu_graph2 = new CpuGraph(cpu_graph_container2);
+        BetterCpuGraph *cpu_graph2 = new BetterCpuGraph(cpu_graph_container2);
 
         // SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
 
@@ -130,18 +131,6 @@ public:
 
         cpu_graph->set_sibling(cpu_graph2);
         cpu_graph2->set_sibling(cpu_graph);
-
-        cpu_graph2->set_mouse_over_callback([this](float x, float y) {
-            std::ostringstream oss;
-            oss << "Graph mouse coords: (" << x << ", " << y << ")";
-            m_coord_label->set_caption(oss.str());
-        });
-
-        cpu_graph->set_mouse_over_callback([this](float x, float y) {
-            std::ostringstream oss;
-            oss << "Graph mouse coords: (" << x << ", " << y << ")";
-            m_coord_label->set_caption(oss.str());
-        });
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);

@@ -1,6 +1,6 @@
 #include "CpuGraph.h"
+#include "BetterCpuGraph.h"
 
-#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <ostream>
@@ -160,15 +160,6 @@ void CpuGraph::draw(NVGcontext *ctx) {
     }
 }
 
-bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
-    if (m_mouse_over_callback) {
-        float x = 2.0f * p.x() / static_cast<float>(m_size.x()) - 1.0f;
-        float y = 1.0f - 2.0f * p.y() / static_cast<float>(m_size.y());
-        m_mouse_over_callback(x, y);
-    }
-    return Canvas::mouse_motion_event(p, rel, button, modifiers);
-}
-
 bool CpuGraph::mouse_button_event(const Vector2i &p, int button, bool down, int modifiers) {
     if (button == 0) {
         if (down) {
@@ -186,9 +177,9 @@ bool CpuGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
     }
     // Forward to sibling
     if (m_sibling && !m_forwarding) {
-        m_sibling->m_forwarding = true;
+        m_sibling->set_forwarding(true);
         m_sibling->mouse_button_event(p, button, down, modifiers);
-        m_sibling->m_forwarding = false;
+        m_sibling->set_forwarding(false);
     }
     return Canvas::mouse_button_event(p, button, down, modifiers);
 }
@@ -205,9 +196,9 @@ bool CpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
 
         // Forward to sibling
         if (m_sibling && !m_forwarding) {
-            m_sibling->m_forwarding = true;
+            m_sibling->set_forwarding(true);
             m_sibling->mouse_drag_event(p, rel, button, modifiers);
-            m_sibling->m_forwarding = false;
+            m_sibling->set_forwarding(false);
         }
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
@@ -235,9 +226,9 @@ bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
 
     // Forward to sibling
     if (m_sibling && !m_forwarding) {
-        m_sibling->m_forwarding = true;
+        m_sibling->set_forwarding(true);
         m_sibling->scroll_event(p, rel);
-        m_sibling->m_forwarding = false;
+        m_sibling->set_forwarding(false);
     }
 
     return Canvas::scroll_event(p, rel);

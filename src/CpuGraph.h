@@ -6,11 +6,13 @@
 #include <functional>
 #include <nanogui/canvas.h>
 #include <nanogui/shader.h>
-#include <nanogui/widget.h>
 #include <nanogui/theme.h>
 
 #include "CpuHistory.h"
 #include "LineGraph.h"
+
+// Forward declare BetterCpuGraph so we can reference it in this .h file without creating a circular dependency
+class BetterCpuGraph;
 
 using namespace nanogui;
 
@@ -27,13 +29,9 @@ public:
     void set_paused(const bool paused) { m_paused = paused; }
     bool paused() const { return m_paused; }
 
-    void set_sibling(CpuGraph *sibling) { m_sibling = sibling; }
+    void set_sibling(BetterCpuGraph *sibling) { m_sibling = sibling; }
 
-    void set_mouse_over_callback(const MouseOverCallback &callback) {
-        m_mouse_over_callback = callback;
-    }
-
-    bool mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) override;
+    void set_forwarding(const bool forwarding) { m_forwarding = forwarding; }
 
     bool mouse_button_event(const Vector2i &p, int button, bool down, int modifiers) override;
 
@@ -55,14 +53,13 @@ private:
     bool m_paused = false;
     bool m_dragging = false;
     bool m_was_paused_before_drag = true;
-    MouseOverCallback m_mouse_over_callback;
 
     // This is the number of frames we wait before taking another sample
     int m_sample_interval;
     double m_game_time = 0.0;
     int m_frame_count = 0;
 
-    CpuGraph *m_sibling = nullptr;
+    BetterCpuGraph *m_sibling = nullptr;
     bool m_forwarding = false;
 };
 
