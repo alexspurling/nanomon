@@ -19,7 +19,7 @@ using nanogui::Shader;
 constexpr float Pi = 3.14159f;
 
 // Number of samples of the underlying data to take when displaying as a graph
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 300;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
 
 // How many times per second we want to sample
 static constexpr int SAMPLE_FREQUENCY = 6;
@@ -134,31 +134,31 @@ void CpuGraph::draw(NVGcontext *ctx) {
     Canvas::draw(ctx);
 
     // Now overlay grid line labels using NanoVG
-    // if (!m_line_graphs.empty()) {
-    //     const size_t num_points = m_line_graphs[0].size();
-    //     if (num_points > 0) {
-    //         nvgFontSize(ctx, 14.0f);
-    //         nvgFontFace(ctx, "sans");
-    //         nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
-    //         nvgFillColor(ctx, m_theme->m_text_color);
-    //
-    //         const double x_offset = m_line_graphs[0].get_x_offset();
-    //
-    //         for (size_t i = 0; i < num_points; i++) {
-    //             const float ndc_x = m_line_graphs[0].data()[i * 2] - static_cast<float>(x_offset);
-    //
-    //             // Convert NDC x (-1..1) to pixel x within the widget
-    //             float px = m_pos.x() + (ndc_x + 1.0f) * 0.5f * m_size.x();
-    //
-    //             // Pixel y = top of the widget (with small padding)
-    //             float py = m_pos.y() + 4.0f;
-    //
-    //             std::ostringstream oss;
-    //             oss << std::fixed << std::setprecision(2) << m_line_graphs[0].get_sample_x(static_cast<int>(i));
-    //             nvgText(ctx, px, py, oss.str().c_str(), nullptr);
-    //         }
-    //     }
-    // }
+    if (!m_line_graphs.empty()) {
+        const size_t num_points = m_line_graphs[0].size();
+        if (num_points > 0) {
+            nvgFontSize(ctx, 14.0f);
+            nvgFontFace(ctx, "sans");
+            nvgTextAlign(ctx, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+            nvgFillColor(ctx, m_theme->m_text_color);
+
+            const double x_offset = m_line_graphs[0].get_x_offset();
+
+            for (size_t i = 0; i < num_points; i++) {
+                const float ndc_x = m_line_graphs[0].data()[i * 2] - static_cast<float>(x_offset);
+
+                // Convert NDC x (-1..1) to pixel x within the widget
+                float px = m_pos.x() + (ndc_x + 1.0f) * 0.5f * m_size.x();
+
+                // Pixel y = top of the widget (with small padding)
+                float py = m_pos.y() + 4.0f;
+
+                std::ostringstream oss;
+                oss << std::fixed << std::setprecision(2) << m_line_graphs[0].get_sample_x(static_cast<int>(i));
+                nvgText(ctx, px, py, oss.str().c_str(), nullptr);
+            }
+        }
+    }
 }
 
 bool CpuGraph::mouse_motion_event(const Vector2i &p, const Vector2i &rel, int button, int modifiers) {
@@ -321,7 +321,7 @@ void CpuGraph::draw_contents() {
     const size_t num_points = m_line_graphs[0].size();
     const auto x_offset = static_cast<float>(m_line_graphs[0].get_x_offset());
 
-    // draw_grid(num_points, x_offset);
+    draw_grid(num_points, x_offset);
 
     // Render each core's line strip
     for (size_t i = 0; i < m_line_graphs.size(); i++) {
