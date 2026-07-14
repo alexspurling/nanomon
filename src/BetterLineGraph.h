@@ -78,6 +78,16 @@ public:
         return m_last_stats;
     }
 
+    /**
+     * Set the window for auto-scroll: anchor the window to @p raw_end
+     * (the latest sample index) but snap both start and end to
+     * decimation-step boundaries so that the sample indices selected by
+     * generate_vertices remain stable as new data arrives.
+     *
+     * This prevents the "dancing" effect when step > 1.
+     */
+    void set_window_auto_scroll(int num_samples, int max_vertices);
+
 private:
     int m_core_id;
     int m_sample_window_size;

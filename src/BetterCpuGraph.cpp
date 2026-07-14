@@ -191,23 +191,8 @@ void BetterCpuGraph::draw_contents() {
 
     // ---- 2. auto-scroll (when not paused) ----
     if (!m_paused) {
-        // Compute step the same way as BetterLineGraph::generate_vertices
-        const int first = std::max(
-            static_cast<int>(std::floor(static_cast<double>(num_samples - 1) - m_window_width)),
-            SAMPLE_WINDOW_SIZE);
-        const int last = num_samples - 1;
-        const int visible_count = last - first + 1;
-        const int step = std::max(1, visible_count / MAX_VERTICES);
-
-        // Snap both start and end to step boundaries so the window advances
-        // in increments of `step`, not 1.  This keeps the sample indices
-        // selected by generate_vertices stable as new data arrives,
-        // preventing the "dancing" effect when step > 1.
-        const double end_idx_raw = static_cast<double>(num_samples - 1);
-        const double end_idx     = std::floor(end_idx_raw / step) * step;
-        const double start_idx   = end_idx - std::floor(m_window_width / step) * step;
         for (auto &lg : m_line_graphs)
-            lg.set_window(start_idx, end_idx);
+            lg.set_window_auto_scroll(num_samples, MAX_VERTICES);
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
