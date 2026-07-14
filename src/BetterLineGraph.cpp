@@ -22,11 +22,13 @@ void BetterLineGraph::zoom(const double factor, const double center_idx) {
 }
 
 std::vector<float> BetterLineGraph::generate_vertices(
-        const CpuHistory& history, const int max_vertices) const {
+        const CpuHistory& history, const int max_vertices) {
 
     const int total_samples = history.num_samples();
-    if (total_samples < m_sample_window_size + 1)
+    if (total_samples < m_sample_window_size + 1) {
+        m_last_stats = {};
         return {};
+    }
 
     // Clamp the visible range to available data
     const int first = std::max(
@@ -36,8 +38,10 @@ std::vector<float> BetterLineGraph::generate_vertices(
         static_cast<int>(std::ceil(m_view_end)),
         total_samples - 1);
 
-    if (first > last)
+    if (first > last) {
+        m_last_stats = {};
         return {};
+    }
 
     const int visible_count = last - first + 1;
 
@@ -46,10 +50,17 @@ std::vector<float> BetterLineGraph::generate_vertices(
     const int step = std::max(1, visible_count / max_vertices);
     const int count = (visible_count + step - 1) / step; // ceil division
 
+    const double data_width = m_view_end - m_view_start;
+
+    // Store stats
+    m_last_stats.total_samples = total_samples;
+    m_last_stats.visible_count = visible_count;
+    m_last_stats.step          = step;
+    m_last_stats.count         = count;
+    m_last_stats.data_width    = data_width;
+
     std::vector<float> vertices;
     vertices.reserve(count * 2);
-
-    const double data_width = m_view_end - m_view_start;
 
     for (int i = 0; i < count; ++i) {
         const int sample_idx = first + i * step;
@@ -59,7 +70,7 @@ std::vector<float> BetterLineGraph::generate_vertices(
         const float x = static_cast<float>(t * 2.0 - 1.0);
 
         // Compute CPU usage for this sample
-        const CoreSample prev = history.sample_at(m_core_id, sample_idx - m_sample_window_size);
+        const CoreSample prev = history.sample_at(m_core_id, sample_idx - m_sample_window_size * step);
         const CoreSample curr = history.sample_at(m_core_id, sample_idx);
 
         const double total_diff = curr.total_time - prev.total_time;

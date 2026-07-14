@@ -61,7 +61,14 @@ public:
 
         Widget *cpu_graph_container2 = new Widget(this);
         cpu_graph_container2->set_fixed_height(250);
-        BetterCpuGraph *cpu_graph2 = new BetterCpuGraph(cpu_graph_container2);
+        m_cpu_graph2 = new BetterCpuGraph(cpu_graph_container2);
+
+        // Labels below cpu_graph2 showing BetterLineGraph stats
+        m_total_samples_label = new Label(this, "total_samples: --", "sans-bold");
+        m_visible_count_label = new Label(this, "visible_count: --", "sans-bold");
+        m_step_label = new Label(this, "step: --", "sans-bold");
+        m_count_label = new Label(this, "count: --", "sans-bold");
+        m_data_width_label = new Label(this, "data_width: --", "sans-bold");
 
         // SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
 
@@ -129,8 +136,8 @@ public:
 
         m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
 
-        cpu_graph->set_sibling(cpu_graph2);
-        cpu_graph2->set_sibling(cpu_graph);
+        cpu_graph->set_sibling(m_cpu_graph2);
+        m_cpu_graph2->set_sibling(cpu_graph);
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
@@ -198,6 +205,22 @@ public:
     }
 
     void draw(NVGcontext *ctx) override {
+        // Update stats labels from BetterCpuGraph (always, even when paused)
+        if (m_cpu_graph2 && m_total_samples_label) {
+            std::ostringstream oss;
+            const auto &s = m_cpu_graph2->stats(0);
+            oss.str(""); oss << "total_samples: " << s.total_samples;
+            m_total_samples_label->set_caption(oss.str());
+            oss.str(""); oss << "visible_count: " << s.visible_count;
+            m_visible_count_label->set_caption(oss.str());
+            oss.str(""); oss << "step: " << s.step;
+            m_step_label->set_caption(oss.str());
+            oss.str(""); oss << "count: " << s.count;
+            m_count_label->set_caption(oss.str());
+            oss.str(""); oss << "data_width: " << s.data_width;
+            m_data_width_label->set_caption(oss.str());
+        }
+
         /* Draw the user interface */
         Screen::draw(ctx);
     }
@@ -226,6 +249,12 @@ public:
     }
 private:
     Label *m_coord_label;
+    BetterCpuGraph *m_cpu_graph2 = nullptr;
+    Label *m_total_samples_label = nullptr;
+    Label *m_visible_count_label = nullptr;
+    Label *m_step_label = nullptr;
+    Label *m_count_label = nullptr;
+    Label *m_data_width_label = nullptr;
     ref<Shader> m_shader;
     ref<RenderPass> m_render_pass;
 };

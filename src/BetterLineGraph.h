@@ -4,6 +4,17 @@
 #include "CpuHistory.h"
 
 /**
+ * Statistics about the last vertex generation pass.
+ */
+struct LineGraphStats {
+    int total_samples = 0;
+    int visible_count = 0;
+    int step          = 0;
+    int count         = 0;
+    double data_width = 0.0;
+};
+
+/**
  * A windowed view onto a single core's CPU history data.
  *
  * BetterLineGraph represents a movable, zoomable window defined by
@@ -60,11 +71,18 @@ public:
      *          empty when there is not enough history data yet.
      */
     std::vector<float> generate_vertices(const CpuHistory& history,
-                                         int max_vertices) const;
+                                         int max_vertices);
+
+    /** Last-computed stats (set by generate_vertices). */
+    [[nodiscard]] const LineGraphStats& last_stats() const {
+        return m_last_stats;
+    }
 
 private:
     int m_core_id;
     int m_sample_window_size;
     double m_view_start = 0.0;
     double m_view_end   = 30.0;
+
+    LineGraphStats m_last_stats;
 };

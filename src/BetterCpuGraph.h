@@ -38,6 +38,11 @@ public:
 
     void set_forwarding(bool forwarding) { m_forwarding = forwarding; }
 
+    /** Access per-core stats from the last vertex generation pass. */
+    [[nodiscard]] const LineGraphStats& stats(size_t core_id) const {
+        return m_line_graphs[core_id].last_stats();
+    }
+
     bool mouse_button_event(const Vector2i &p, int button, bool down,
                             int modifiers) override;
     bool mouse_drag_event(const Vector2i &p, const Vector2i &rel,
@@ -65,7 +70,7 @@ private:
     /// Visible window width in sample-index units.
     double m_window_width = 30.0;
 
-    static constexpr int MAX_VERTICES = 200;
+    static constexpr int MAX_VERTICES = 50;
     static constexpr int SAMPLE_FREQUENCY = 6;
     static constexpr int SAMPLE_WINDOW_SIZE = 2;
 };
