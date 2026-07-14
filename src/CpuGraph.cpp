@@ -42,7 +42,6 @@ static constexpr size_t num_colours = std::size(core_colours);
 
 static const Vector3f GRID_COLOUR = {0.0f, 0.4f, 0.0f};
 
-int frame_count = 0;
 
 CpuGraph::CpuGraph(Widget *parent)
     : Canvas(parent, 1) {
@@ -179,14 +178,17 @@ bool CpuGraph::mouse_button_event(const Vector2i &p, int button, bool down, int 
             if (!m_paused) {
                 set_paused(true);
             }
-            return true;
-        }
-        if (m_dragging) {
+        } else if (m_dragging) {
             // End dragging — keep drag offset, just restore pause state
             m_dragging = false;
             set_paused(m_was_paused_before_drag);
-            return true;
         }
+    }
+    // Forward to sibling
+    if (m_sibling && !m_forwarding) {
+        m_sibling->m_forwarding = true;
+        m_sibling->mouse_button_event(p, button, down, modifiers);
+        m_sibling->m_forwarding = false;
     }
     return Canvas::mouse_button_event(p, button, down, modifiers);
 }
@@ -197,19 +199,24 @@ bool CpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, int butt
             return true;
         }
         // Delegate to LineGraph — it accumulates and snaps the drag offset
-        for (auto & m_line_graph : m_line_graphs) {
-            m_line_graph.apply_drag_offset(-rel.x() * 2.0 / static_cast<double>(m_size.x()));
+        for (auto & line_graph : m_line_graphs) {
+            line_graph.apply_drag_offset(-rel.x() * 2.0 / static_cast<double>(m_size.x()));
         }
 
-        return true;
+        // Forward to sibling
+        if (m_sibling && !m_forwarding) {
+            m_sibling->m_forwarding = true;
+            m_sibling->mouse_drag_event(p, rel, button, modifiers);
+            m_sibling->m_forwarding = false;
+        }
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
 }
 
 bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     // calculate the new left and right positions
-    for (auto & m_line_graph : m_line_graphs) {
-        const double cur_width = m_line_graph.get_data_width();
+    for (auto & line_graph : m_line_graphs) {
+        const double cur_width = line_graph.get_data_width();
         constexpr double scroll_factor = 1.1;
         double new_width;
         if (rel.y() < 0) {
@@ -220,11 +227,19 @@ bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
         }
         // Origin around the current cursor position
         double mouse_x_ratio = static_cast<double>(p.x()) / static_cast<double>(m_size.x());
-        const double mouse_x = m_line_graph.start_x() + cur_width * mouse_x_ratio;
-        m_line_graph.set_start_and_end_x(
+        const double mouse_x = line_graph.start_x() + cur_width * mouse_x_ratio;
+        line_graph.set_start_and_end_x(
             mouse_x - mouse_x_ratio * new_width,
             mouse_x + (1.0 - mouse_x_ratio) * new_width);
     }
+
+    // Forward to sibling
+    if (m_sibling && !m_forwarding) {
+        m_sibling->m_forwarding = true;
+        m_sibling->scroll_event(p, rel);
+        m_sibling->m_forwarding = false;
+    }
+
     return Canvas::scroll_event(p, rel);
 }
 
@@ -296,7 +311,7 @@ void CpuGraph::draw_contents() {
     m_game_time += 1.0 / 60.0; // one frame step
     // }
 
-    const int frame_interval_remainder = frame_count % m_sample_interval;
+    const int frame_interval_remainder = m_frame_count % m_sample_interval;
     if (frame_interval_remainder == 0) {
         // TODO Remove timestamp?
         const Timestamp now = std::chrono::system_clock::now();
@@ -304,7 +319,7 @@ void CpuGraph::draw_contents() {
         m_cpu_history.sample(now);
     }
 
-    frame_count++;
+    m_frame_count++;
 
     const int num_samples = m_cpu_history.num_samples();
     if (num_samples < SAMPLE_WINDOW_SIZE + 1) {

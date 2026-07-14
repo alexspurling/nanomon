@@ -27,6 +27,8 @@ public:
     void set_paused(const bool paused) { m_paused = paused; }
     bool paused() const { return m_paused; }
 
+    void set_sibling(CpuGraph *sibling) { m_sibling = sibling; }
+
     void set_mouse_over_callback(const MouseOverCallback &callback) {
         m_mouse_over_callback = callback;
     }
@@ -58,6 +60,10 @@ private:
     // This is the number of frames we wait before taking another sample
     int m_sample_interval;
     double m_game_time = 0.0;
+    int m_frame_count = 0;
+
+    CpuGraph *m_sibling = nullptr;
+    bool m_forwarding = false;
 };
 
 #endif //NANOMON_CPUGRAPH_H
