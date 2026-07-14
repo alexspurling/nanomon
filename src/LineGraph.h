@@ -86,7 +86,7 @@ private:
     std::vector<float> m_data;
     double m_smooth_offset = 0.0;
     double m_last_quantized = 0.0;
-    double m_scroll_speed = 1.0;
+    double m_scroll_speed = 6.0;
     double m_start_x = 0.0;
     double m_end_x = 10.0;
     double m_game_time = 0.0;

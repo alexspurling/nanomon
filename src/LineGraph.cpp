@@ -62,15 +62,24 @@ double LineGraph::get_sample_x(const size_t i) const {
 
 void LineGraph::set_start_and_end_x(const double start, const double end) {
     const double total_scroll = m_scroll_speed * m_game_time - 2.0;
+    const double width = end - start;
+
+    // The rightmost visible data point, accounting for the combined
+    // smooth scrolling and drag offsets (both in NDC units)
+    const double effective_end = end + get_x_offset() * width / 2.0;
+
     double adjusted_end = end;
     double adjusted_start = start;
-    if (adjusted_end > total_scroll) {
-        const double delta = adjusted_end - total_scroll;
-        adjusted_end = total_scroll;
-        adjusted_start -= delta;
+
+    if (effective_end > total_scroll) {
+        const double excess = effective_end - total_scroll;
+        adjusted_end = end - excess;
+        adjusted_start = start - excess;
     }
+
     m_start_x = adjusted_start;
     m_end_x = adjusted_end;
+    recompute_y_values();
 }
 
 double LineGraph::compute_y(const double sample_x) const {
@@ -86,20 +95,11 @@ void LineGraph::apply_drag_offset(const double delta_ndc) {
     const double dx_ndc = dx_data * 2.0 / get_data_width();
 
     // Snap to grid when accumulated drag offset exceeds one grid spacing
-    if (m_drag_offset >= dx_ndc) {
+    if (std::abs(m_drag_offset) >= dx_ndc) {
         const int num_steps = static_cast<int>(m_drag_offset / dx_ndc);
         const double shift = num_steps * dx_data;
-        m_start_x += shift;
-        m_end_x += shift;
         m_drag_offset -= num_steps * dx_ndc;
-        recompute_y_values();
-    } else if (m_drag_offset <= -dx_ndc) {
-        const int num_steps = static_cast<int>((-m_drag_offset) / dx_ndc);
-        const double shift = num_steps * dx_data;
-        m_start_x -= shift;
-        m_end_x -= shift;
-        m_drag_offset += num_steps * dx_ndc;
-        recompute_y_values();
+        set_start_and_end_x(m_start_x + shift, m_end_x + shift);
     }
 
     // Cap: rightmost visible point shouldn't exceed total_scroll.

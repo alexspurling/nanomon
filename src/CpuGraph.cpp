@@ -19,10 +19,10 @@ using nanogui::Shader;
 constexpr float Pi = 3.14159f;
 
 // Number of samples of the underlying data to take when displaying as a graph
-static constexpr size_t GRAPH_DATA_MAX_POINTS = 30;
+static constexpr size_t GRAPH_DATA_MAX_POINTS = 300;
 
 // How many times per second we want to sample
-static constexpr int SAMPLE_FREQUENCY = 1;
+static constexpr int SAMPLE_FREQUENCY = 6;
 
 // Number of samples to average over to calculate the value of each point on the graph
 static constexpr int SAMPLE_WINDOW_SIZE = 2;
@@ -292,15 +292,15 @@ void CpuGraph::draw_contents() {
     using namespace nanogui;
 
     // Advance game time (paused when dragging or explicitly paused)
-    if (!m_paused) {
-        m_game_time += 1.0 / 60.0; // one frame step
-    }
+    // if (!m_paused) {
+    m_game_time += 1.0 / 60.0; // one frame step
+    // }
 
     const int frame_interval_remainder = frame_count % m_sample_interval;
     if (frame_interval_remainder == 0) {
         // TODO Remove timestamp?
         const Timestamp now = std::chrono::system_clock::now();
-        std::cout << "cpu sample at: " << now << ", game_time: " << m_game_time << std::endl;
+        // std::cout << "cpu sample at: " << now << ", game_time: " << m_game_time << std::endl;
         m_cpu_history.sample(now);
     }
 
