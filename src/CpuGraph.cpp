@@ -86,17 +86,16 @@ CpuGraph::CpuGraph(Widget *parent)
     );
 
     // Determine number of cores from the sampler
-    CpuTimesSampler sampler;
-    auto stat = sampler.sample();
-    size_t num_cores = stat.size();
+    auto stat = CpuTimesSampler::sample();
+    int num_cores = static_cast<int>(stat.size());
 
     // Create one LineGraph per core with a value_func lambda that interpolates
     // sample data for the corresponding core_id
     m_line_graphs.reserve(num_cores);
-    for (size_t core_id = 0; core_id < num_cores; core_id++) {
+    for (int core_id = 0; core_id < num_cores; core_id++) {
         m_line_graphs.emplace_back(
             GRAPH_DATA_MAX_POINTS,
-            [this, core_id](double sample_x) -> double {
+            [this, core_id](const double sample_x) -> double {
                 // sample_x is the data-space x, which corresponds to a sample index
                 const int num_samples = m_cpu_history.num_samples();
                 // Clamp to valid range; return 0.0 for out-of-range
@@ -104,7 +103,7 @@ CpuGraph::CpuGraph(Widget *parent)
                     return 0.0;
                 }
                 const float y = compute_core_y(
-                    static_cast<int>(core_id),
+                    core_id,
                     static_cast<float>(sample_x),
                     SAMPLE_WINDOW_SIZE);
                 // compute_core_y returns -1..1, convert to 0..1 for LineGraph

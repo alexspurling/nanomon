@@ -31,15 +31,15 @@ public:
     void draw(NVGcontext *ctx) override;
     void draw_contents() override;
 
-    void set_paused(bool paused) { m_paused = paused; }
+    void set_paused(const bool paused) { m_paused = paused; }
     [[nodiscard]] bool paused() const { return m_paused; }
 
     void set_sibling(CpuGraph *sibling) { m_sibling = sibling; }
 
-    void set_forwarding(bool forwarding) { m_forwarding = forwarding; }
+    void set_forwarding(const bool forwarding) { m_forwarding = forwarding; }
 
     /** Access per-core stats from the last vertex generation pass. */
-    [[nodiscard]] const LineGraphStats& stats(size_t core_id) const {
+    [[nodiscard]] const LineGraphStats& stats(const int core_id) const {
         return m_line_graphs[core_id].last_stats();
     }
 

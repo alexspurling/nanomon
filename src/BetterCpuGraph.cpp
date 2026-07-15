@@ -2,7 +2,6 @@
 #include "CpuGraph.h"
 
 #include <chrono>
-#include <iostream>
 #include <nanogui/opengl.h>
 #include <nanogui/renderpass.h>
 
@@ -70,15 +69,14 @@ BetterCpuGraph::BetterCpuGraph(Widget *parent)
                                VERT_SRC, FRAG_SRC);
 
     // Discover core count and create one BetterLineGraph per core
-    CpuTimesSampler sampler;
-    const auto stat = sampler.sample();
-    const size_t num_cores = stat.size();
+    const auto stat = CpuTimesSampler::sample();
+    const int num_cores = static_cast<int>(stat.size());
 
     m_line_graphs.reserve(num_cores);
-    for (size_t core_id = 0; core_id < num_cores; core_id++) {
+    for (int core_id = 0; core_id < num_cores; core_id++) {
         m_line_graphs.emplace_back(
-            static_cast<int>(core_id),
-            [this, core_id](int prev_idx, int curr_idx) -> double {
+            core_id,
+            [this, core_id](const int prev_idx, const int curr_idx) -> double {
                 const CoreSample& prev = m_cpu_history.sample_at(core_id, prev_idx);
                 const CoreSample& curr = m_cpu_history.sample_at(core_id, curr_idx);
                 const double total_diff = curr.total_time - prev.total_time;
