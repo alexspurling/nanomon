@@ -69,6 +69,8 @@ public:
         m_step_label = new Label(this, "step: --", "sans-bold");
         m_count_label = new Label(this, "count: --", "sans-bold");
         m_data_width_label = new Label(this, "data_width: --", "sans-bold");
+        m_start_label = new Label(this, "start: --", "sans-bold");
+        m_end_label = new Label(this, "end: --", "sans-bold");
 
         // SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
 
@@ -219,6 +221,10 @@ public:
             m_count_label->set_caption(oss.str());
             oss.str(""); oss << "data_width: " << s.data_width;
             m_data_width_label->set_caption(oss.str());
+            oss.str(""); oss << "start: " << s.start;
+            m_start_label->set_caption(oss.str());
+            oss.str(""); oss << "end: " << s.end;
+            m_end_label->set_caption(oss.str());
         }
 
         /* Draw the user interface */
@@ -255,6 +261,8 @@ private:
     Label *m_step_label = nullptr;
     Label *m_count_label = nullptr;
     Label *m_data_width_label = nullptr;
+    Label *m_start_label = nullptr;
+    Label *m_end_label = nullptr;
     ref<Shader> m_shader;
     ref<RenderPass> m_render_pass;
 };

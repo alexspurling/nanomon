@@ -76,8 +76,18 @@ BetterCpuGraph::BetterCpuGraph(Widget *parent)
 
     m_line_graphs.reserve(num_cores);
     for (size_t core_id = 0; core_id < num_cores; core_id++) {
-        m_line_graphs.emplace_back(static_cast<int>(core_id),
-                                   SAMPLE_WINDOW_SIZE);
+        m_line_graphs.emplace_back(
+            static_cast<int>(core_id),
+            [this, core_id](int prev_idx, int curr_idx) -> double {
+                const CoreSample& prev = m_cpu_history.sample_at(core_id, prev_idx);
+                const CoreSample& curr = m_cpu_history.sample_at(core_id, curr_idx);
+                const double total_diff = curr.total_time - prev.total_time;
+                const double idle_diff  = curr.idle_time  - prev.idle_time;
+                return (total_diff > 0.0)
+                    ? (total_diff - idle_diff) / total_diff
+                    : 0.0;
+            },
+            SAMPLE_WINDOW_SIZE);
     }
 
     m_sample_interval = 60 / SAMPLE_FREQUENCY;
@@ -196,20 +206,17 @@ void BetterCpuGraph::draw_contents() {
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
-    const auto first_verts = m_line_graphs[0].generate_vertices(
-        m_cpu_history, MAX_VERTICES);
+    const auto first_verts = m_line_graphs[0].generate_vertices(num_samples, MAX_VERTICES);
     if (first_verts.empty())
         return;
 
     // draw_grid(first_verts);
 
     // ---- 4. render each core's line strip ----
-    render_line_strip(m_shader, first_verts,
-                      core_colours[0 % num_colours]);
+    render_line_strip(m_shader, first_verts, core_colours[0 % num_colours]);
 
     for (size_t i = 1; i < m_line_graphs.size(); ++i) {
-        const auto verts = m_line_graphs[i].generate_vertices(
-            m_cpu_history, MAX_VERTICES);
+        const auto verts = m_line_graphs[i].generate_vertices(num_samples, MAX_VERTICES);
         if (verts.empty())
             continue;
         render_line_strip(m_shader, verts,

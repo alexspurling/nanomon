@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "CpuHistory.h"
+#include <functional>
 
 /**
  * Statistics about the last vertex generation pass.
@@ -12,29 +12,35 @@ struct LineGraphStats {
     int step          = 0;
     int count         = 0;
     double data_width = 0.0;
+    double start = 0.0;
+    double end = 0.0;
 };
 
 /**
- * A windowed view onto a single core's CPU history data.
+ * A windowed view over a sequence of samples identified by index.
  *
  * BetterLineGraph represents a movable, zoomable window defined by
  * floating-point sample indices [m_view_start, m_view_end].  It does
  * not own a fixed-size vertex buffer; instead it generates interleaved
  * (x, y) NDC vertex data on demand by walking the visible portion of
- * the underlying CpuHistory.
+ * the index range.
  *
- * This keeps the design simple: the window is the single source of
- * truth, and vertex data is always consistent with the current window
- * and the current history state.
+ * A caller-provided function translates (prev_idx, curr_idx) into a
+ * usage value in [0,1], decoupling the vertex generation from the
+ * underlying data source.
  */
 class BetterLineGraph {
 public:
     /**
-     * @param core_id           which core's data this graph displays
+     * @param core_id            which core's data this graph displays
+     * @param sample_fn          function that maps (prev_idx, curr_idx) to a
+     *                           usage value in [0, 1]
      * @param sample_window_size number of consecutive samples used to
      *                           compute a single CPU-usage value
      */
-    BetterLineGraph(int core_id, int sample_window_size = 2);
+    BetterLineGraph(int core_id,
+                    std::function<double(int prev_idx, int curr_idx)> sample_fn,
+                    int sample_window_size = 2);
 
     // ---- window management ----
 
@@ -70,8 +76,9 @@ public:
      * @return  flat vector of floats: [x0, y0, x1, y1, …]
      *          empty when there is not enough history data yet.
      */
-    std::vector<float> generate_vertices(const CpuHistory& history,
-                                         int max_vertices);
+    std::vector<float> generate_vertices(
+        int total_samples,
+        int max_vertices);
 
     /** Last-computed stats (set by generate_vertices). */
     [[nodiscard]] const LineGraphStats& last_stats() const {
@@ -90,6 +97,7 @@ public:
 
 private:
     int m_core_id;
+    std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
     int m_sample_window_size;
     double m_view_start = 0.0;
     double m_view_end   = 30.0;
