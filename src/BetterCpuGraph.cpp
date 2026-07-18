@@ -2,6 +2,7 @@
 #include "CpuGraph.h"
 
 #include <chrono>
+#include <iostream>
 #include <nanogui/opengl.h>
 #include <nanogui/renderpass.h>
 
@@ -26,8 +27,9 @@ static const Vector3f GRID_COLOUR = {0.0f, 0.4f, 0.0f};
 
 static const char *VERT_SRC = R"(#version 330
 in vec2 points;
+uniform float x_offset;
 void main() {
-    gl_Position = vec4(points, 0.0, 1.0);
+    gl_Position = vec4(points.x - x_offset, points.y, 0.0, 1.0);
 })";
 
 static const char *FRAG_SRC = R"(#version 330
@@ -41,11 +43,13 @@ void main() {
 
 static void render_line_strip(nanogui::Shader *shader,
                               const std::vector<float> &verts,
+                              const float x_offset,
                               const Vector3f &colour) {
     using namespace nanogui;
     const size_t n = verts.size() / 2;
     shader->set_buffer("points", VariableType::Float32, {n, 2}, verts.data());
     shader->set_uniform("line_color", colour);
+    shader->set_uniform("x_offset", x_offset);
     shader->begin();
     shader->draw_array(Shader::PrimitiveType::LineStrip, 0, n, false);
     shader->end();
@@ -123,8 +127,7 @@ bool BetterCpuGraph::mouse_button_event(const Vector2i &p, int button,
     return Canvas::mouse_button_event(p, button, down, modifiers);
 }
 
-bool BetterCpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
-                                       int button, int modifiers) {
+bool BetterCpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, const int button, const int modifiers) {
     if (button == 1 && m_dragging && m_size.x() > 0) {
         // Convert pixel delta → NDC delta → sample-index delta
         const double ndc_per_pixel = 2.0 / static_cast<double>(m_size.x());
@@ -132,7 +135,7 @@ bool BetterCpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
         const double idx_delta = ndc_delta * m_window_width / 2.0;
 
         for (auto &lg : m_line_graphs)
-            lg.pan(idx_delta);
+            lg.pan(m_cpu_history.num_samples(), idx_delta);
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
 }
@@ -148,7 +151,7 @@ bool BetterCpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
 
     for (auto &lg : m_line_graphs) {
-        lg.zoom(factor, mouse_ratio);
+        lg.zoom(m_cpu_history.num_samples(), factor, mouse_ratio);
     }
 
     m_window_width = m_line_graphs[0].view_width();
@@ -192,30 +195,39 @@ void BetterCpuGraph::draw_contents() {
     // ---- 1. sample at fixed interval ----
     if (m_frame_count % m_sample_interval == 0) {
         m_cpu_history.sample(std::chrono::system_clock::now());
+        num_samples = m_cpu_history.num_samples();
 
         // ---- 2. auto-scroll (when not paused) ----
         if (!m_paused) {
-            num_samples = m_cpu_history.num_samples();
-            for (auto &lg : m_line_graphs)
-                lg.scroll_step(num_samples);
+            for (auto &lg : m_line_graphs) {
+                lg.add_sample(num_samples);
+            }
         }
     }
-    m_frame_count++;
+    for (auto &lg : m_line_graphs) {
+        lg.update_scroll(num_samples, static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
+    }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
-    const auto first_verts = m_line_graphs[0].generate_vertices(num_samples);
-    if (first_verts.empty())
-        return;
+    // const auto first_verts = m_line_graphs[0].generate_vertices(num_samples);
+    // if (first_verts.empty())
+    //     return;
 
     // draw_grid(first_verts);
 
-    // ---- 4. render each core's line strip ----
-    render_line_strip(m_shader, first_verts, core_colours[0 % num_colours]);
+    // render_line_strip(m_shader, first_verts, core_colours[0 % num_colours]);
 
-    for (size_t i = 1; i < m_line_graphs.size(); ++i) {
-        const auto verts = m_line_graphs[i].generate_vertices(num_samples);
-        if (verts.empty())
+    // ---- 4. render each core's line strip ----
+    for (size_t i = 0; i < m_line_graphs.size(); ++i) {
+        const auto verts = m_line_graphs[i].get_vertices(num_samples);
+        if (verts.empty()) {
             continue;
-        render_line_strip(m_shader, verts, core_colours[i % num_colours]);
+        }
+        const double scroll_offset = m_line_graphs[i].get_scroll_offset();
+        // if (i == 0) {
+        //     std::cout << "scroll offset: " << scroll_offset << ", frame: " << m_frame_count % m_sample_interval << std::endl;
+        // }
+        render_line_strip(m_shader, verts, static_cast<float>(scroll_offset), core_colours[i % num_colours]);
     }
+    m_frame_count++;
 }

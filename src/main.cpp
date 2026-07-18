@@ -125,21 +125,21 @@ public:
         //     speed_label->set_caption(oss.str());
         // });
         //
-        // // Pause button row
-        // Widget *pause_row = new Widget(this);
-        // pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        // Button *pause_button = new Button(pause_row, "Resume");
-        // pause_button->set_flags(Button::ToggleButton);
-        // pause_button->set_pushed(true);
-        // pause_button->set_change_callback([cpu_graph, pause_button](bool pushed) {
-        //     cpu_graph->set_paused(pushed);
-        //     pause_button->set_caption(pushed ? "Resume" : "Pause");
-        // });
+        // Pause button row
+        Widget *pause_row = new Widget(this);
+        pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+        Button *pause_button = new Button(pause_row, "Resume");
+        pause_button->set_flags(Button::ToggleButton);
+        pause_button->set_pushed(true);
+        pause_button->set_change_callback([this, pause_button](bool pushed) {
+            m_cpu_graph2->set_paused(pushed);
+            pause_button->set_caption(pushed ? "Resume" : "Pause");
+        });
 
         m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
 
-        cpu_graph->set_sibling(m_cpu_graph2);
-        m_cpu_graph2->set_sibling(cpu_graph);
+        // cpu_graph->set_sibling(cpu_graph2);
+        // cpu_graph2->set_sibling(cpu_graph);
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
