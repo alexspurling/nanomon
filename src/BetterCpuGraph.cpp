@@ -125,7 +125,7 @@ bool BetterCpuGraph::mouse_button_event(const Vector2i &p, int button,
 
 bool BetterCpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
                                        int button, int modifiers) {
-    if (button == 0 && m_dragging && m_size.x() > 0) {
+    if (button == 1 && m_dragging && m_size.x() > 0) {
         // Convert pixel delta → NDC delta → sample-index delta
         const double ndc_per_pixel = 2.0 / static_cast<double>(m_size.x());
         const double ndc_delta = -rel.x() * ndc_per_pixel;

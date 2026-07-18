@@ -14,6 +14,7 @@ BetterLineGraph::BetterLineGraph(
     , m_max_vertices(max_vertices) {}
 
 void BetterLineGraph::pan(const double delta_idx) {
+    std::cout << "pan: " << delta_idx << std::endl;
     set_view_window(m_view_start + delta_idx, m_view_end + delta_idx);
 }
 
@@ -29,8 +30,6 @@ void BetterLineGraph::zoom(const double factor, const double mouse_ratio) {
     const double new_view_end = mouse_idx + new_width * (1.0 - mouse_ratio);
 
     set_view_window(new_view_start, new_view_end);
-    m_view_start = static_cast<int>(new_view_start);
-    m_view_end = static_cast<int>(new_view_end);
 }
 
 void BetterLineGraph::set_view_window(const double start_idx, const double end_idx) {
