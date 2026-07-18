@@ -40,12 +40,13 @@ public:
      */
     BetterLineGraph(int core_id,
                     std::function<double(int prev_idx, int curr_idx)> sample_fn,
-                    int sample_window_size = 2);
+                    int sample_window_size = 2,
+                    int max_vertices = 50);
 
     // ---- window management ----
 
     /** Reposition the window to exactly [start_idx, end_idx]. */
-    void set_window(double start_idx, double end_idx);
+    // void set_window(double start_idx, double end_idx);
 
     /** Shift the window by @p delta_idx sample indices. */
     void pan(double delta_idx);
@@ -77,8 +78,7 @@ public:
      *          empty when there is not enough history data yet.
      */
     std::vector<float> generate_vertices(
-        int total_samples,
-        int max_vertices);
+        int total_samples);
 
     /** Last-computed stats (set by generate_vertices). */
     [[nodiscard]] const LineGraphStats& last_stats() const {
@@ -93,14 +93,22 @@ public:
      *
      * This prevents the "dancing" effect when step > 1.
      */
-    void set_window_auto_scroll(int num_samples, int max_vertices);
+    void scroll_step(int num_samples);
 
 private:
+    /**
+     * Decimation step: how many sample indices each drawn vertex spans.
+     * Derived from the view window width and the vertex budget so the
+     * graph never emits more than @p max_vertices vertices.
+     */
+    [[nodiscard]] int compute_step() const;
+
     int m_core_id;
     std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
-    int m_sample_window_size;
-    double m_view_start = 0.0;
-    double m_view_end   = 30.0;
+    int m_min_sample_window_size;
+    int m_max_vertices;
+    int m_view_start = -50;
+    int m_view_end   = 50;
 
     LineGraphStats m_last_stats;
 };

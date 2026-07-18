@@ -71,6 +71,6 @@ private:
     double m_window_width = 30.0;
 
     static constexpr int MAX_VERTICES = 50;
-    static constexpr int SAMPLE_FREQUENCY = 6;
+    static constexpr int SAMPLE_FREQUENCY = 1;
     static constexpr int SAMPLE_WINDOW_SIZE = 2;
 };

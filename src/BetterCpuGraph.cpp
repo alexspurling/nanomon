@@ -85,7 +85,8 @@ BetterCpuGraph::BetterCpuGraph(Widget *parent)
                     ? (total_diff - idle_diff) / total_diff
                     : 0.0;
             },
-            SAMPLE_WINDOW_SIZE);
+            SAMPLE_WINDOW_SIZE,
+            MAX_VERTICES);
     }
 
     m_sample_interval = 60 / SAMPLE_FREQUENCY;
@@ -188,23 +189,23 @@ void BetterCpuGraph::draw_grid(const std::vector<float> &vertices) {
 void BetterCpuGraph::draw_contents() {
     using namespace nanogui;
 
+    int num_samples = m_cpu_history.num_samples();
+
     // ---- 1. sample at fixed interval ----
-    if (m_frame_count % m_sample_interval == 0)
+    if (m_frame_count % m_sample_interval == 0) {
         m_cpu_history.sample(std::chrono::system_clock::now());
+
+        // ---- 2. auto-scroll (when not paused) ----
+        if (!m_paused) {
+            num_samples = m_cpu_history.num_samples();
+            for (auto &lg : m_line_graphs)
+                lg.scroll_step(num_samples);
+        }
+    }
     m_frame_count++;
 
-    const int num_samples = m_cpu_history.num_samples();
-    if (num_samples < SAMPLE_WINDOW_SIZE + 1 || m_line_graphs.empty())
-        return;
-
-    // ---- 2. auto-scroll (when not paused) ----
-    if (!m_paused) {
-        for (auto &lg : m_line_graphs)
-            lg.set_window_auto_scroll(num_samples, MAX_VERTICES);
-    }
-
     // ---- 3. generate vertices for the first core (also used for grid) ----
-    const auto first_verts = m_line_graphs[0].generate_vertices(num_samples, MAX_VERTICES);
+    const auto first_verts = m_line_graphs[0].generate_vertices(num_samples);
     if (first_verts.empty())
         return;
 
@@ -214,10 +215,9 @@ void BetterCpuGraph::draw_contents() {
     render_line_strip(m_shader, first_verts, core_colours[0 % num_colours]);
 
     for (size_t i = 1; i < m_line_graphs.size(); ++i) {
-        const auto verts = m_line_graphs[i].generate_vertices(num_samples, MAX_VERTICES);
+        const auto verts = m_line_graphs[i].generate_vertices(num_samples);
         if (verts.empty())
             continue;
-        render_line_strip(m_shader, verts,
-                          core_colours[i % num_colours]);
+        render_line_strip(m_shader, verts, core_colours[i % num_colours]);
     }
 }

@@ -1,5 +1,7 @@
 #include "CpuHistory.h"
 
+#include <iostream>
+
 CpuHistory::CpuHistory()
 {
     const auto stat = m_sampler.sample();
@@ -22,5 +24,9 @@ int CpuHistory::num_samples() const {
 }
 
 const CoreSample& CpuHistory::sample_at(const int core_id, const int index) const {
+    int sample_count = m_cpu_history[core_id].size();
+    if (index < 0 || index >= sample_count) {
+        std::cerr << "CpuHistory::sample_at: index out of range. index: " << index << ", range: 0-" << sample_count << std::endl;
+    }
     return m_cpu_history[core_id][index];
 }
