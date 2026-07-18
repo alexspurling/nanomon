@@ -142,16 +142,14 @@ bool BetterCpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
         return Canvas::scroll_event(p, rel);
 
     // Find the sample index under the mouse cursor
-    const double mouse_ndc = 2.0 * p.x() / static_cast<double>(m_size.x()) - 1.0;
-    const auto &lg0 = m_line_graphs[0];
-    const double center_idx = lg0.view_start() +
-        (mouse_ndc + 1.0) * 0.5 * lg0.view_width();
-
+    // const double mouse_ndc = 2.0 * p.x() / static_cast<double>(m_size.x()) - 1.0;
+    const double mouse_ratio = p.x() / static_cast<double>(m_size.x());
     constexpr double zoom_factor = 1.1;
-    const double factor = (-rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
+    const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
 
-    for (auto &lg : m_line_graphs)
-        lg.zoom(factor, center_idx);
+    for (auto &lg : m_line_graphs) {
+        lg.zoom(factor, mouse_ratio);
+    }
 
     m_window_width = m_line_graphs[0].view_width();
     return Canvas::scroll_event(p, rel);

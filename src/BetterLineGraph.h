@@ -51,12 +51,9 @@ public:
     /** Shift the window by @p delta_idx sample indices. */
     void pan(double delta_idx);
 
-    /**
-     * Zoom the window by @p factor around @p center_idx (in sample-index
-     * space).  factor > 1  → zoom in  (narrower window);
-     * factor < 1  → zoom out (wider window).
-     */
-    void zoom(double factor, double center_idx);
+    void set_view_window(double new_view_start, double new_view_end);
+
+    void zoom(double factor, double mouse_ratio);
 
     // ---- accessors ----
 

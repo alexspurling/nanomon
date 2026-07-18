@@ -14,20 +14,29 @@ BetterLineGraph::BetterLineGraph(
     , m_max_vertices(max_vertices) {}
 
 void BetterLineGraph::pan(const double delta_idx) {
-    m_view_start += delta_idx;
-    m_view_end   += delta_idx;
+    set_view_window(m_view_start + delta_idx, m_view_end + delta_idx);
 }
 
-void BetterLineGraph::zoom(const double factor, const double center_idx) {
-    const double half_width = view_width() * 0.5 / factor;
-    m_view_start = center_idx - half_width;
-    m_view_end   = center_idx + half_width;
+void BetterLineGraph::zoom(const double factor, const double mouse_ratio) {
+    const double width = view_width();
+    const double new_width = width * factor;
+    if (width <= 2 && factor < 1.0) {
+        return; // Can't zoom in beyond this
+    }
+    const double mouse_idx = m_view_start + mouse_ratio * width;
+
+    const double new_view_start = mouse_idx - new_width * mouse_ratio;
+    const double new_view_end = mouse_idx + new_width * (1.0 - mouse_ratio);
+
+    set_view_window(new_view_start, new_view_end);
+    m_view_start = static_cast<int>(new_view_start);
+    m_view_end = static_cast<int>(new_view_end);
 }
 
-// void BetterLineGraph::set_window(const double start_idx, const double end_idx) {
-//     m_view_start = start_idx;
-//     m_view_end   = end_idx;
-// }
+void BetterLineGraph::set_view_window(const double start_idx, const double end_idx) {
+    m_view_start = start_idx;
+    m_view_end   = end_idx;
+}
 
 int BetterLineGraph::compute_step() const {
     // Step spans (window width / vertex budget) sample indices, so the
@@ -36,9 +45,6 @@ int BetterLineGraph::compute_step() const {
 }
 
 void BetterLineGraph::scroll_step(const int num_samples) {
-
-    const double prev_start = m_view_start;
-    const double prev_end = m_view_end;
     const int step = compute_step();
 
     // Increment every time we get step samples plus one extra. We need the extra sample to produce a line-segment.
@@ -46,15 +52,6 @@ void BetterLineGraph::scroll_step(const int num_samples) {
     if ((num_samples - 1) % step == 0) {
         m_view_end += step;
         m_view_start += step;
-    }
-
-    if (m_core_id == 0) {
-        if (prev_start != m_view_start) {
-            std::cout << "prev start: " << prev_start << ", new start: " << m_view_start << std::endl;
-        }
-        if (prev_end != m_view_end) {
-            std::cout << "prev end: " << prev_end << ", new end: " << m_view_end << std::endl;
-        }
     }
 }
 
