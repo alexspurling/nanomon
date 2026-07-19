@@ -158,7 +158,15 @@ bool BetterCpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     return Canvas::scroll_event(p, rel);
 }
 
-// ---- grid ----
+void BetterCpuGraph::nudge_start(const double delta) {
+    for (auto &lg : m_line_graphs)
+        lg.set_view_start(lg.view_start() + delta);
+}
+
+void BetterCpuGraph::nudge_end(const double delta) {
+    for (auto &lg : m_line_graphs)
+        lg.set_view_end(lg.view_end() + delta);
+}
 
 void BetterCpuGraph::draw_grid(const std::vector<float> &vertices) {
     if (vertices.empty())
@@ -178,6 +186,7 @@ void BetterCpuGraph::draw_grid(const std::vector<float> &vertices) {
 
     m_grid_shader->set_buffer("points", VariableType::Float32,
                               {num_verts * 2, 2}, grid_points.data());
+    m_grid_shader->set_uniform("x_offset", 0.0f);
     m_grid_shader->set_uniform("line_color", GRID_COLOUR);
     m_grid_shader->begin();
     m_grid_shader->draw_array(Shader::PrimitiveType::Line, 0,
@@ -203,23 +212,26 @@ void BetterCpuGraph::draw_contents() {
                 lg.add_sample(num_samples);
             }
         }
+        for (auto &lg : m_line_graphs) {
+            lg.update_points(num_samples);
+        }
     }
     for (auto &lg : m_line_graphs) {
         lg.update_scroll(num_samples, static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
-    // const auto first_verts = m_line_graphs[0].generate_vertices(num_samples);
-    // if (first_verts.empty())
-    //     return;
+    const auto first_verts = m_line_graphs[0].get_vertices();
+    if (first_verts.empty())
+        return;
 
-    // draw_grid(first_verts);
+    draw_grid(first_verts);
 
     // render_line_strip(m_shader, first_verts, core_colours[0 % num_colours]);
 
     // ---- 4. render each core's line strip ----
     for (size_t i = 0; i < m_line_graphs.size(); ++i) {
-        const auto verts = m_line_graphs[i].get_vertices(num_samples);
+        const auto verts = m_line_graphs[i].get_vertices();
         if (verts.empty()) {
             continue;
         }

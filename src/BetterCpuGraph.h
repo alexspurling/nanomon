@@ -33,6 +33,8 @@ public:
 
     void set_paused(const bool paused) { m_paused = paused; }
     [[nodiscard]] bool paused() const { return m_paused; }
+    void nudge_start(double delta);
+    void nudge_end(double delta);
 
     void set_sibling(CpuGraph *sibling) { m_sibling = sibling; }
 

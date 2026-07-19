@@ -37,15 +37,25 @@ void BetterLineGraph::set_view_window(const int num_samples, const double view_s
     // Set the start and end values so we can calculate the step at the new window size
     m_view_start = view_start;
     m_view_end   = view_end;
-    const int step = calculate_step();
-    const double max_end = std::min(view_end, static_cast<double>(num_samples - step));
-    const double actual_start = max_end - (view_end - view_start);
-    m_view_start = actual_start;
-    m_view_end   = max_end;
+    // const int step = calculate_step();
+    // const double max_end = std::min(view_end, static_cast<double>(num_samples - step));
+    // const double actual_start = max_end - (view_end - view_start);
+    // m_view_start = actual_start;
+    // m_view_end   = max_end;
+    //
+    // std::cout << "view_start: " << view_start << ", view_end: " << view_end <<
+    //     ", actual_start: " << actual_start << ", max_end: " << max_end <<
+    //     ", m_view_start: " << m_view_start << ", m_view_end: " << m_view_end << std::endl;
+}
 
-    std::cout << "view_start: " << view_start << ", view_end: " << view_end <<
-        ", actual_start: " << actual_start << ", max_end: " << max_end <<
-        ", m_view_start: " << m_view_start << ", m_view_end: " << m_view_end << std::endl;
+void BetterLineGraph::set_view_start(const double start) {
+    m_view_start = start;
+    m_last_stats.start = start;
+}
+
+void BetterLineGraph::set_view_end(const double end) {
+    m_view_end = end;
+    m_last_stats.end = end;
 }
 
 int BetterLineGraph::calculate_step() const {
@@ -90,7 +100,7 @@ void BetterLineGraph::update_points(const int num_samples) {
 
     // Store stats
     m_last_stats.total_samples = num_samples;
-    m_last_stats.visible_count = 0;
+    m_last_stats.excess_samples = num_samples - m_view_end;
     m_last_stats.step          = step;
     m_last_stats.count         = 0;
     m_last_stats.data_width    = data_width;
@@ -101,13 +111,18 @@ void BetterLineGraph::update_points(const int num_samples) {
 
     m_vertices.clear();
 
+    // Expand the width of the screen by one division so we can ensure that we always draw lines that reach the boundary
+    // of the canvas and prevent gaps at the edge of our graph
+    const int visible_count = data_width / step;
+    const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
+
     for (int sample_idx = first_idx; sample_idx <= last_idx; sample_idx += step) {
         const int prev_idx = std::max(0, sample_idx - sample_window_size);
         const double function_y = m_sample_fn(prev_idx, sample_idx);
 
         // Map sample index → NDC x in [-1, 1]
-        const double t = (static_cast<double>(sample_idx) - m_view_start) / (data_width - 1);
-        const float x = static_cast<float>(t * 2.0 - 1.0);
+        const double t = (static_cast<double>(sample_idx) - m_view_start) / data_width;
+        const float x = static_cast<float>(t * graph_screen_width - 1.0);
 
         // Map value [0, 1] → NDC y [-1, 1]
         const float y = static_cast<float>(function_y) * 2.0f - 1.0f;
@@ -117,6 +132,10 @@ void BetterLineGraph::update_points(const int num_samples) {
     }
 
     m_last_stats.count = m_vertices.size() / 2;
+    m_last_stats.graph_width = m_vertices[m_vertices.size() - 2] - m_vertices[0];
+
+    std::cout << "visible_count: " << visible_count << ", graph_screen_width: " << graph_screen_width <<
+        ", x n-2: " << m_vertices[m_vertices.size() - 4] << ", x n-1: " << m_vertices[m_vertices.size() - 2] << std::endl;
 }
 
 void BetterLineGraph::update_scroll(const int num_samples, const double sample_progress) {
@@ -127,5 +146,8 @@ void BetterLineGraph::update_scroll(const int num_samples, const double sample_p
     // scroll_offset is a number between 0 and step representing how far we are between two step intervals
     double scroll_offset = (num_samples - 1) % step + sample_progress;
     const double data_width = view_width();
-    m_scroll_offset = scroll_offset * 2.0 / data_width;
+
+    const int visible_count = data_width / step;
+    const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
+    m_scroll_offset = scroll_offset * graph_screen_width / data_width;
 }

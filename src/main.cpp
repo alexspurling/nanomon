@@ -69,8 +69,29 @@ public:
         m_step_label = new Label(this, "step: --", "sans-bold");
         m_count_label = new Label(this, "count: --", "sans-bold");
         m_data_width_label = new Label(this, "data_width: --", "sans-bold");
-        m_start_label = new Label(this, "start: --", "sans-bold");
-        m_end_label = new Label(this, "end: --", "sans-bold");
+        m_graph_width_label = new Label(this, "graph_width: --", "sans-bold");
+
+        {
+            Widget *start_row = new Widget(this);
+            start_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+            m_start_dec = new Button(start_row, "-");
+            m_start_label = new Label(start_row, "start: --", "sans-bold");
+            m_start_label->set_fixed_width(100);
+            m_start_inc = new Button(start_row, "+");
+            m_start_dec->set_callback([this] { m_cpu_graph2->nudge_start(-1.0); });
+            m_start_inc->set_callback([this] { m_cpu_graph2->nudge_start(1.0); });
+        }
+
+        {
+            Widget *end_row = new Widget(this);
+            end_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
+            m_end_dec = new Button(end_row, "-");
+            m_end_label = new Label(end_row, "end: --", "sans-bold");
+            m_end_label->set_fixed_width(100);
+            m_end_inc = new Button(end_row, "+");
+            m_end_dec->set_callback([this] { m_cpu_graph2->nudge_end(-1.0); });
+            m_end_inc->set_callback([this] { m_cpu_graph2->nudge_end(1.0); });
+        }
 
         // SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
 
@@ -213,7 +234,7 @@ public:
             const auto &s = m_cpu_graph2->stats(0);
             oss.str(""); oss << "total_samples: " << s.total_samples;
             m_total_samples_label->set_caption(oss.str());
-            oss.str(""); oss << "visible_count: " << s.visible_count;
+            oss.str(""); oss << "excess_samples: " << s.excess_samples;
             m_visible_count_label->set_caption(oss.str());
             oss.str(""); oss << "step: " << s.step;
             m_step_label->set_caption(oss.str());
@@ -225,6 +246,8 @@ public:
             m_start_label->set_caption(oss.str());
             oss.str(""); oss << "end: " << s.end;
             m_end_label->set_caption(oss.str());
+            oss.str(""); oss << "graph_width: " << s.graph_width;
+            m_graph_width_label->set_caption(oss.str());
         }
 
         /* Draw the user interface */
@@ -263,6 +286,11 @@ private:
     Label *m_data_width_label = nullptr;
     Label *m_start_label = nullptr;
     Label *m_end_label = nullptr;
+    Label *m_graph_width_label = nullptr;
+    Button *m_start_dec = nullptr;
+    Button *m_start_inc = nullptr;
+    Button *m_end_dec = nullptr;
+    Button *m_end_inc = nullptr;
     ref<Shader> m_shader;
     ref<RenderPass> m_render_pass;
 };

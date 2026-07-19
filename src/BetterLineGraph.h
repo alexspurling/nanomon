@@ -8,12 +8,13 @@
  */
 struct LineGraphStats {
     int total_samples = 0;
-    int visible_count = 0;
+    int excess_samples = 0;
     int step          = 0;
     int count         = 0;
     double data_width = 0.0;
     double start = 0.0;
     double end = 0.0;
+    double graph_width = 0.0;
 };
 
 /**
@@ -52,6 +53,8 @@ public:
     void pan(int num_samples, double delta_idx);
 
     void set_view_window(int num_samples, double view_start, double view_end);
+    void set_view_start(double start);
+    void set_view_end(double end);
 
     void zoom(int num_samples, double factor, double mouse_ratio);
 
@@ -74,7 +77,7 @@ public:
      * @return  flat vector of floats: [x0, y0, x1, y1, …]
      *          empty when there is not enough history data yet.
      */
-    std::vector<float> get_vertices(int total_samples) {
+    std::vector<float> get_vertices() {
         return m_vertices;
     }
 
@@ -110,8 +113,8 @@ private:
     int m_max_vertices;
     std::vector<float> m_vertices;
 
-    int m_view_start = -30;
-    int m_view_end   = 2;
+    int m_view_start = -12;
+    int m_view_end   = -2;
 
     LineGraphStats m_last_stats;
     double m_scroll_offset = 0.0;
