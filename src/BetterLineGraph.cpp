@@ -20,6 +20,7 @@ void BetterLineGraph::pan(const double delta_idx) {
     const double view_end = m_view_end + m_pan_offset;
     set_view_window(view_start + delta_idx, view_end + delta_idx);
     update_points();
+    update_offset();
 }
 
 void BetterLineGraph::zoom(const double factor, const double mouse_ratio) {
@@ -35,6 +36,7 @@ void BetterLineGraph::zoom(const double factor, const double mouse_ratio) {
 
     set_view_window(new_view_start, new_view_end);
     update_points();
+    update_offset();
 }
 
 void BetterLineGraph::set_view_window(const double view_start, const double view_end) {
@@ -139,13 +141,22 @@ void BetterLineGraph::update_points() {
 }
 
 void BetterLineGraph::update_scroll(const double sample_progress) {
-    // Update the vertex data for this graph based on the new number of samples
     const int step = calculate_step(m_view_start, m_view_end);
 
     // sample_progress is a number between 0 and 1 representing how far we are between two sample intervals
-    // scroll_offset is a number between 0 and step representing how far we are between two step intervals
+    // m_sample_scroll is a number between 0 and step representing how far we are between two step intervals.
+    // Skipping this call freezes the auto-scroll; update_offset still applies pan movement.
     const int step_progress = m_num_samples > 0 ? (m_num_samples - 1) % step : 0;
-    double scroll_offset = step_progress + sample_progress + m_pan_offset;
+    m_sample_scroll = step_progress + sample_progress;
+
+    update_offset();
+}
+
+void BetterLineGraph::update_offset() {
+    const int step = calculate_step(m_view_start, m_view_end);
+
+    // Total offset is the auto-scroll progress plus the fractional pan offset
+    double scroll_offset = m_sample_scroll + m_pan_offset;
 
     // The total scroll must stay within one step; fold any whole steps into the
     // integer view bounds and regenerate the vertices to match

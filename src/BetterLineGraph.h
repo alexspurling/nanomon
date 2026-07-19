@@ -102,6 +102,12 @@ public:
 
     void update_points();
 
+    /**
+     * Advance the auto-scroll progress from the current sample count and
+     * @p sample_progress, then recompute the render offset.  Skip this call
+     * (e.g. while paused) to freeze the auto-scroll; pan and zoom still keep
+     * the offset up to date via update_offset().
+     */
     void update_scroll(double sample_progress);
 
     [[nodiscard]] double get_scroll_offset() const {
@@ -109,6 +115,12 @@ public:
     }
 
 private:
+    /**
+     * Combine the auto-scroll progress and pan offset into m_scroll_offset,
+     * folding any whole steps into the integer view bounds.
+     */
+    void update_offset();
+
     int m_core_id;
     std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
     int m_min_sample_window_size;
@@ -122,4 +134,6 @@ private:
     LineGraphStats m_last_stats;
     double m_scroll_offset = 0.0;
     double m_pan_offset = 0.0;
+    // Auto-scroll progress within the current step, in sample units [0, step)
+    double m_sample_scroll = 0.0;
 };
