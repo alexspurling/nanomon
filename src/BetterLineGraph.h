@@ -96,7 +96,7 @@ public:
      */
     void add_sample(int num_samples);
 
-    int calculate_step() const;
+    int calculate_step(int start, int end) const;
 
     void update_points(int num_samples);
 

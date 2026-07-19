@@ -65,3 +65,6 @@ target_include_directories(nanomon PRIVATE
         ext/nanogui/include
         ${NANOGUI_EXTRA_INCS}
 )
+
+target_compile_options(nanomon PRIVATE -fsanitize=undefined)
+target_link_options(nanomon PRIVATE -fsanitize=undefined)
