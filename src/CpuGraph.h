@@ -9,17 +9,6 @@
 
 using namespace nanogui;
 
-/**
- * A CPU usage time-series widget built on LineGraph.
- *
- * CpuGraph samples CpuHistory at a fixed interval and renders
- * one line strip per CPU core.  Each LineGraph holds a movable,
- * zoomable window over the history data and generates vertex data on
- * demand — only the visible portion is sent to the GPU.
- *
- * Auto-scrolling keeps the window anchored to the latest sample;
- * dragging or zooming temporarily suspends auto-scroll.
- */
 class CpuGraph : public Canvas {
 public:
     explicit CpuGraph(Widget *parent);

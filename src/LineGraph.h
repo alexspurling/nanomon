@@ -3,9 +3,6 @@
 #include <vector>
 #include <functional>
 
-/**
- * Statistics about the last vertex generation pass.
- */
 struct LineGraphStats {
     int total_samples = 0;
     int excess_samples = 0;
@@ -17,37 +14,14 @@ struct LineGraphStats {
     double scroll_offset = 0.0;
 };
 
-/**
- * A windowed view over a sequence of samples identified by index.
- *
- * LineGraph represents a movable, zoomable window defined by
- * floating-point sample indices [m_view_start, m_view_end].  It does
- * not own a fixed-size vertex buffer; instead it generates interleaved
- * (x, y) NDC vertex data on demand by walking the visible portion of
- * the index range.
- *
- * A caller-provided function translates (prev_idx, curr_idx) into a
- * usage value in [0,1], decoupling the vertex generation from the
- * underlying data source.
- */
 class LineGraph {
 public:
-    /**
-     * @param core_id            which core's data this graph displays
-     * @param sample_fn          function that maps (prev_idx, curr_idx) to a
-     *                           usage value in [0, 1]
-     * @param sample_window_size number of consecutive samples used to
-     *                           compute a single CPU-usage value
-     */
     LineGraph(int core_id,
                     std::function<double(int prev_idx, int curr_idx)> sample_fn,
                     int sample_window_size = 2,
                     int max_vertices = 50);
 
     // ---- window management ----
-
-    /** Reposition the window to exactly [start_idx, end_idx]. */
-    // void set_window(double start_idx, double end_idx);
 
     /** Shift the window by @p delta_idx sample indices. */
     void pan(double delta_idx);
@@ -68,46 +42,20 @@ public:
 
     // ---- vertex generation ----
 
-    /**
-     * Produce interleaved (x, y) vertex data in NDC space [-1, 1] for
-     * every *visible* sample in the current window.
-     *
-     * If the window covers more samples than @p max_vertices, the output
-     * is decimated (every Nth sample) so the GPU never receives more
-     * vertices than necessary.
-     *
-     * @return  flat vector of floats: [x0, y0, x1, y1, …]
-     *          empty when there is not enough history data yet.
-     */
     std::vector<float> get_vertices() {
         return m_vertices;
     }
 
-    /** Last-computed stats (set by generate_vertices). */
     [[nodiscard]] const LineGraphStats& last_stats() const {
         return m_last_stats;
     }
 
-    /**
-     * Set the window for auto-scroll: anchor the window to @p raw_end
-     * (the latest sample index) but snap both start and end to
-     * decimation-step boundaries so that the sample indices selected by
-     * generate_vertices remain stable as new data arrives.
-     *
-     * This prevents the "dancing" effect when step > 1.
-     */
     void add_sample();
 
     [[nodiscard]] int calculate_step(int start, int end) const;
 
     void update_points();
 
-    /**
-     * Advance the auto-scroll progress from the current sample count and
-     * @p sample_progress, then recompute the render offset.  Skip this call
-     * (e.g. while paused) to freeze the auto-scroll; pan and zoom still keep
-     * the offset up to date via update_offset().
-     */
     void update_scroll(double sample_progress);
 
     [[nodiscard]] double get_scroll_offset() const {
@@ -115,10 +63,6 @@ public:
     }
 
 private:
-    /**
-     * Combine the auto-scroll progress and pan offset into m_scroll_offset,
-     * folding any whole steps into the integer view bounds.
-     */
     void update_offset();
 
     int m_core_id;
