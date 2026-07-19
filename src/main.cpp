@@ -1,29 +1,17 @@
 #include <nanogui/opengl.h>
 #include <nanogui/screen.h>
-#include <nanogui/window.h>
 #include <nanogui/layout.h>
 #include <nanogui/label.h>
 #include <nanogui/button.h>
-#include <nanogui/slider.h>
 #include <nanogui/vscrollpanel.h>
-#include <nanogui/texture.h>
 #include <nanogui/shader.h>
 #include <nanogui/renderpass.h>
 #include <iostream>
-#include <memory>
 #include <sstream>
-#include <iomanip>
-
-#define STB_IMAGE_STATIC
-#define STB_IMAGE_IMPLEMENTATION
-
-#include <stb_image.h>
 
 #include "CpuGraph.h"
-#include "BetterCpuGraph.h"
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
-#include "SinGraph.h"
 
 using namespace nanogui;
 
@@ -57,11 +45,7 @@ public:
 
         Widget *cpu_graph_container = new Widget(this);
         cpu_graph_container->set_fixed_height(250);
-        CpuGraph *cpu_graph = new CpuGraph(cpu_graph_container);
-
-        Widget *cpu_graph_container2 = new Widget(this);
-        cpu_graph_container2->set_fixed_height(250);
-        m_cpu_graph2 = new BetterCpuGraph(cpu_graph_container2);
+        m_cpu_graph2 = new CpuGraph(cpu_graph_container);
 
         // Labels below cpu_graph2 showing BetterLineGraph stats
         m_total_samples_label = new Label(this, "total_samples: --", "sans-bold");
@@ -93,59 +77,6 @@ public:
             m_end_inc->set_callback([this] { m_cpu_graph2->nudge_end(1.0); });
         }
 
-        // SinGraph *cpu_graph = new SinGraph(cpu_graph_container);
-
-        // Start X slider row
-        // auto *start_x_row = new Widget(this);
-        // start_x_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        // new Label(start_x_row, "Start X:", "sans-bold");
-        // auto *start_x_slider = new Slider(start_x_row);
-        // start_x_slider->set_range({0.0f, 50.0f});
-        // start_x_slider->set_value(0.0f);
-        // start_x_slider->set_fixed_width(200);
-        // auto *start_x_label = new Label(start_x_row, "0.0", "sans-bold");
-        // start_x_label->set_fixed_width(50);
-        // start_x_slider->set_callback([cpu_graph, start_x_label](float value) {
-        //     cpu_graph->set_start_x(value);
-        //     std::ostringstream oss;
-        //     oss << std::fixed << std::setprecision(3) << value;
-        //     start_x_label->set_caption(oss.str());
-        // });
-        //
-        // // End X slider row
-        // auto *end_x_row = new Widget(this);
-        // end_x_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        // new Label(end_x_row, "End X:", "sans-bold");
-        // auto *end_x_slider = new Slider(end_x_row);
-        // end_x_slider->set_range({2.0f, 50.0f});
-        // end_x_slider->set_value(10.0f);
-        // end_x_slider->set_fixed_width(200);
-        // auto *end_x_label = new Label(end_x_row, "10.0", "sans-bold");
-        // end_x_label->set_fixed_width(50);
-        // end_x_slider->set_callback([cpu_graph, end_x_label](float value) {
-        //     cpu_graph->set_end_x(value);
-        //     std::ostringstream oss;
-        //     oss << std::fixed << std::setprecision(3) << value;
-        //     end_x_label->set_caption(oss.str());
-        // });
-        //
-        // // Screen dx
-        // auto *speed_row = new Widget(this);
-        // speed_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        // new Label(speed_row, "speed x:", "sans-bold");
-        // auto *speed_slider = new Slider(speed_row);
-        // speed_slider->set_range({0.0f, 10.0f});
-        // speed_slider->set_value(cpu_graph->get_speed());
-        // speed_slider->set_fixed_width(200);
-        // auto *speed_label = new Label(speed_row, std::to_string(speed_slider->value()), "sans-bold");
-        // speed_label->set_fixed_width(60);
-        // speed_slider->set_callback([cpu_graph, speed_label](float value) {
-        //     cpu_graph->set_speed(value);
-        //     std::ostringstream oss;
-        //     oss << std::fixed << std::setprecision(3) << value;
-        //     speed_label->set_caption(oss.str());
-        // });
-        //
         // Pause button row
         Widget *pause_row = new Widget(this);
         pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
@@ -158,9 +89,6 @@ public:
         });
 
         m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
-
-        // cpu_graph->set_sibling(cpu_graph2);
-        // cpu_graph2->set_sibling(cpu_graph);
 
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
@@ -228,7 +156,7 @@ public:
     }
 
     void draw(NVGcontext *ctx) override {
-        // Update stats labels from BetterCpuGraph (always, even when paused)
+        // Update stats labels from CpuGraph (always, even when paused)
         if (m_cpu_graph2 && m_total_samples_label) {
             std::ostringstream oss;
             const auto &s = m_cpu_graph2->stats(0);
@@ -278,7 +206,7 @@ public:
     }
 private:
     Label *m_coord_label;
-    BetterCpuGraph *m_cpu_graph2 = nullptr;
+    CpuGraph *m_cpu_graph2 = nullptr;
     Label *m_total_samples_label = nullptr;
     Label *m_visible_count_label = nullptr;
     Label *m_step_label = nullptr;

@@ -1,97 +1,139 @@
-#ifndef NANOMON_LINEGRAPH_H
-#define NANOMON_LINEGRAPH_H
+#pragma once
 
 #include <vector>
-#include <cstddef>
 #include <functional>
 
-class LineGraph {
-public:
-
-    explicit LineGraph(size_t num_points, std::function<double(double)> value_func);
-
-    /**
-     * Advance the simulation to the given game_time. Recomputes y-values
-     * in the buffer if the quantized scroll offset has changed since the
-     * last call.
-     */
-    void advance_time(double game_time);
-
-    /**
-     * Force a full recomputation of all y-values in the buffer.
-     * Used after dragging shifts the visible window.
-     */
-    void recompute_y_values();
-
-    /**
-     * Combined x offset in NDC units: smooth sub-step scrolling offset
-     * plus any drag offset. Used by the shader for continuous scrolling.
-     */
-    [[nodiscard]]
-    double get_x_offset() const;
-
-    /**
-     * The data-space x value at buffer index i, accounting for the
-     * current quantized offset and the visible window.
-     */
-    [[nodiscard]]
-    double get_sample_x(size_t i) const;
-
-    /** Raw access to the interleaved x/y buffer for rendering. */
-    [[nodiscard]]
-    const float* data() const { return m_data.data(); }
-
-    /** Number of points in the buffer. */
-    [[nodiscard]]
-    size_t size() const;
-
-    [[nodiscard]]
-    double start_x() const { return m_start_x; }
-    [[nodiscard]]
-    double end_x() const { return m_end_x; }
-    [[nodiscard]]
-    double get_data_width() const { return m_end_x - m_start_x; }
-    void set_start_and_end_x(double start, double end);
-
-    [[nodiscard]]
-    double scroll_speed() const { return m_scroll_speed; }
-    void set_scroll_speed(double speed) { m_scroll_speed = speed; }
-
-    /**
-     * The smooth scrolling remainder offset, always less than one grid
-     * spacing (dx_data). This is the sub-grid portion of the total
-     * scroll that hasn't yet been quantized into m_start_x/m_end_x.
-     */
-    [[nodiscard]]
-    double x_offset() const { return m_smooth_offset; }
-
-    [[nodiscard]]
-    size_t num_points() const { return m_num_points; }
-
-    [[nodiscard]]
-    double compute_y(double sample_x) const;
-
-    /**
-     * Apply an incremental drag delta (in NDC units). Accumulates the
-     * offset internally. If the accumulated data-space delta exceeds
-     * one grid spacing, shifts the view window by whole grid spacings
-     * and recomputes y-values, keeping only the sub-grid remainder.
-     */
-    void apply_drag_offset(double delta_ndc);
-
-private:
-    void initialise_x_values();
-
-    std::function<double(double)> m_value_func;
-    std::vector<float> m_data;
-    double m_smooth_offset = 0.0;
-    double m_last_quantized = 0.0;
-    double m_scroll_speed = 6.0;
-    double m_start_x = 0.0;
-    double m_end_x = 10.0;
-    double m_game_time = 0.0;
-    double m_drag_offset = 0.0;
-    size_t m_num_points;
+/**
+ * Statistics about the last vertex generation pass.
+ */
+struct LineGraphStats {
+    int total_samples = 0;
+    int excess_samples = 0;
+    int step          = 0;
+    int count         = 0;
+    double data_width = 0.0;
+    double start = 0.0;
+    double end = 0.0;
+    double scroll_offset = 0.0;
 };
 
-#endif // NANOMON_LINEGRAPH_H
+/**
+ * A windowed view over a sequence of samples identified by index.
+ *
+ * LineGraph represents a movable, zoomable window defined by
+ * floating-point sample indices [m_view_start, m_view_end].  It does
+ * not own a fixed-size vertex buffer; instead it generates interleaved
+ * (x, y) NDC vertex data on demand by walking the visible portion of
+ * the index range.
+ *
+ * A caller-provided function translates (prev_idx, curr_idx) into a
+ * usage value in [0,1], decoupling the vertex generation from the
+ * underlying data source.
+ */
+class LineGraph {
+public:
+    /**
+     * @param core_id            which core's data this graph displays
+     * @param sample_fn          function that maps (prev_idx, curr_idx) to a
+     *                           usage value in [0, 1]
+     * @param sample_window_size number of consecutive samples used to
+     *                           compute a single CPU-usage value
+     */
+    LineGraph(int core_id,
+                    std::function<double(int prev_idx, int curr_idx)> sample_fn,
+                    int sample_window_size = 2,
+                    int max_vertices = 50);
+
+    // ---- window management ----
+
+    /** Reposition the window to exactly [start_idx, end_idx]. */
+    // void set_window(double start_idx, double end_idx);
+
+    /** Shift the window by @p delta_idx sample indices. */
+    void pan(double delta_idx);
+
+    void set_view_window(double view_start, double view_end);
+    void set_view_start(int start);
+    void set_view_end(int end);
+
+    void zoom(double factor, double mouse_ratio);
+
+    // ---- accessors ----
+
+    [[nodiscard]] int view_start() const { return m_view_start; }
+    [[nodiscard]] int view_end()   const { return m_view_end; }
+    [[nodiscard]] int view_width() const { return m_view_end - m_view_start; }
+
+    void set_num_samples(int n) { m_num_samples = n; }
+
+    // ---- vertex generation ----
+
+    /**
+     * Produce interleaved (x, y) vertex data in NDC space [-1, 1] for
+     * every *visible* sample in the current window.
+     *
+     * If the window covers more samples than @p max_vertices, the output
+     * is decimated (every Nth sample) so the GPU never receives more
+     * vertices than necessary.
+     *
+     * @return  flat vector of floats: [x0, y0, x1, y1, …]
+     *          empty when there is not enough history data yet.
+     */
+    std::vector<float> get_vertices() {
+        return m_vertices;
+    }
+
+    /** Last-computed stats (set by generate_vertices). */
+    [[nodiscard]] const LineGraphStats& last_stats() const {
+        return m_last_stats;
+    }
+
+    /**
+     * Set the window for auto-scroll: anchor the window to @p raw_end
+     * (the latest sample index) but snap both start and end to
+     * decimation-step boundaries so that the sample indices selected by
+     * generate_vertices remain stable as new data arrives.
+     *
+     * This prevents the "dancing" effect when step > 1.
+     */
+    void add_sample();
+
+    [[nodiscard]] int calculate_step(int start, int end) const;
+
+    void update_points();
+
+    /**
+     * Advance the auto-scroll progress from the current sample count and
+     * @p sample_progress, then recompute the render offset.  Skip this call
+     * (e.g. while paused) to freeze the auto-scroll; pan and zoom still keep
+     * the offset up to date via update_offset().
+     */
+    void update_scroll(double sample_progress);
+
+    [[nodiscard]] double get_scroll_offset() const {
+        return m_scroll_offset;
+    }
+
+private:
+    /**
+     * Combine the auto-scroll progress and pan offset into m_scroll_offset,
+     * folding any whole steps into the integer view bounds.
+     */
+    void update_offset();
+
+    int m_core_id;
+    std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
+    int m_min_sample_window_size;
+    int m_max_vertices;
+    int m_num_samples = 0;
+    std::vector<float> m_vertices;
+
+    int m_view_start = -12;
+    int m_view_end   = -2;
+
+    LineGraphStats m_last_stats;
+    double m_scroll_offset = 0.0;
+    double m_pan_offset = 0.0;
+    // Auto-scroll progress within the current step, in sample units [0, step)
+    double m_sample_scroll = 0.0;
+};
