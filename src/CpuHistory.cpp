@@ -9,7 +9,7 @@ CpuHistory::CpuHistory()
     m_cpu_history.resize(num_cores);
 }
 
-void CpuHistory::sample(const Timestamp &timestamp) {
+int CpuHistory::sample(const Timestamp &timestamp) {
     const std::vector<CpuStat> cpu_stats = m_sampler.sample();
 
     // Record a CoreSample for each core
@@ -17,6 +17,8 @@ void CpuHistory::sample(const Timestamp &timestamp) {
         const CpuStat& stat = cpu_stats[i];
         m_cpu_history[i].push_back(CoreSample(stat.total(), stat.idle));
     }
+
+    return m_cpu_history[0].size();
 }
 
 int CpuHistory::num_samples() const {

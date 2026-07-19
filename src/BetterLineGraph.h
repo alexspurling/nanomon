@@ -50,19 +50,21 @@ public:
     // void set_window(double start_idx, double end_idx);
 
     /** Shift the window by @p delta_idx sample indices. */
-    void pan(int num_samples, double delta_idx);
+    void pan(double delta_idx);
 
-    void set_view_window(int num_samples, double view_start, double view_end);
+    void set_view_window(double view_start, double view_end);
     void set_view_start(double start);
     void set_view_end(double end);
 
-    void zoom(int num_samples, double factor, double mouse_ratio);
+    void zoom(double factor, double mouse_ratio);
 
     // ---- accessors ----
 
     double view_start() const { return m_view_start; }
     double view_end()   const { return m_view_end; }
     double view_width() const { return m_view_end - m_view_start; }
+
+    void set_num_samples(int n) { m_num_samples = n; }
 
     // ---- vertex generation ----
 
@@ -94,13 +96,13 @@ public:
      *
      * This prevents the "dancing" effect when step > 1.
      */
-    void add_sample(int num_samples);
+    void add_sample();
 
     int calculate_step(int start, int end) const;
 
-    void update_points(int num_samples);
+    void update_points();
 
-    void update_scroll(int num_samples, double sample_progress);
+    void update_scroll(double sample_progress);
 
     double get_scroll_offset() {
         return m_scroll_offset;
@@ -111,6 +113,7 @@ private:
     std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
     int m_min_sample_window_size;
     int m_max_vertices;
+    int m_num_samples = 0;
     std::vector<float> m_vertices;
 
     int m_view_start = -12;

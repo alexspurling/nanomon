@@ -13,12 +13,12 @@ BetterLineGraph::BetterLineGraph(
     , m_min_sample_window_size(sample_window_size)
     , m_max_vertices(max_vertices){}
 
-void BetterLineGraph::pan(const int num_samples, const double delta_idx) {
+void BetterLineGraph::pan(const double delta_idx) {
     std::cout << "pan: " << delta_idx << std::endl;
-    set_view_window(num_samples, m_view_start + delta_idx, m_view_end + delta_idx);
+    set_view_window(m_view_start + delta_idx, m_view_end + delta_idx);
 }
 
-void BetterLineGraph::zoom(const int num_samples, const double factor, const double mouse_ratio) {
+void BetterLineGraph::zoom(const double factor, const double mouse_ratio) {
     const double width = view_width();
     const double new_width = width * factor;
     if (width <= 2 && factor < 1.0) {
@@ -29,18 +29,18 @@ void BetterLineGraph::zoom(const int num_samples, const double factor, const dou
     const double new_view_start = mouse_idx - new_width * mouse_ratio;
     const double new_view_end = mouse_idx + new_width * (1.0 - mouse_ratio);
 
-    set_view_window(num_samples, new_view_start, new_view_end);
-    update_points(m_last_stats.total_samples);
+    set_view_window(new_view_start, new_view_end);
+    update_points();
 }
 
-void BetterLineGraph::set_view_window(const int num_samples, const double view_start, const double view_end) {
+void BetterLineGraph::set_view_window(const double view_start, const double view_end) {
 
     const int step = calculate_step(static_cast<int>(view_start), static_cast<int>(view_end));
 
-    // Find the largest multiple of step that is less than or equal to (num_samples - step)
+    // Find the largest multiple of step that is less than or equal to (m_num_samples - step)
     // We subtract one step from the max value to always ensure that we are rendering one line
     // segment beyond the right-hand side of the graph
-    const int max_end = (num_samples / step - 1) * step;
+    const int max_end = (m_num_samples / step - 1) * step;
     // Requested end rounded to the nearest step
     m_view_end = std::min(max_end, static_cast<int>(view_end / step) * step);
     m_view_start = m_view_end - static_cast<int>((view_end - view_start) / step) * step;
@@ -64,21 +64,21 @@ int BetterLineGraph::calculate_step(const int start, const int end) const {
     return std::max(1, (end - start) / m_max_vertices);
 }
 
-void BetterLineGraph::add_sample(const int num_samples) {
+void BetterLineGraph::add_sample() {
     const int step = calculate_step(m_view_start, m_view_end);
 
     // Increment every time we get step samples plus one extra. We need the extra sample to produce a line-segment.
     // For example, if step == 2, then 5 samples are needed to generate 2 line-segments and 7 samples to generate 3 line-segments.
-    if ((num_samples - 1) % step == 0) {
+    if ((m_num_samples - 1) % step == 0) {
         m_view_end += step;
         m_view_start += step;
     }
 
     // Update the vertex data for this graph based on the new number of samples
-    update_points(num_samples);
+    update_points();
 }
 
-void BetterLineGraph::update_points(const int num_samples) {
+void BetterLineGraph::update_points() {
 
     // Update the vertex data for this graph based on the new number of samples
     const int step = calculate_step(m_view_start, m_view_end);
@@ -91,8 +91,8 @@ void BetterLineGraph::update_points(const int num_samples) {
     const double data_width = view_width();
 
     // Store stats
-    m_last_stats.total_samples = num_samples;
-    m_last_stats.excess_samples = num_samples - m_view_end;
+    m_last_stats.total_samples = m_num_samples;
+    m_last_stats.excess_samples = m_num_samples - m_view_end;
     m_last_stats.step          = step;
     m_last_stats.count         = 0;
     m_last_stats.data_width    = data_width;
@@ -100,14 +100,14 @@ void BetterLineGraph::update_points(const int num_samples) {
     m_last_stats.end           = m_view_end;
 
     // We need at least sample_window_size + step samples in order to create two points to form a line-segment
-    if (num_samples <= sample_window_size + step) {
+    if (m_num_samples <= sample_window_size + step) {
         m_last_stats = {};
         return;
     }
 
     // Snap the sample indices to a multiple of the step
     const int first_idx = std::max(m_view_start / step * step, sample_window_size);
-    const int last_idx = std::min(m_view_end / step * step, num_samples - 1);
+    const int last_idx = std::min(m_view_end / step * step, m_num_samples - 1);
 
     // vertices.reserve(count * 2);
 
@@ -140,13 +140,13 @@ void BetterLineGraph::update_points(const int num_samples) {
     //     ", x n-2: " << m_vertices[m_vertices.size() - 4] << ", x n-1: " << m_vertices[m_vertices.size() - 2] << std::endl;
 }
 
-void BetterLineGraph::update_scroll(const int num_samples, const double sample_progress) {
+void BetterLineGraph::update_scroll(const double sample_progress) {
     // Update the vertex data for this graph based on the new number of samples
     const int step = calculate_step(m_view_start, m_view_end);
 
     // sample_progress is a number between 0 and 1 representing how far we are between two sample intervals
     // scroll_offset is a number between 0 and step representing how far we are between two step intervals
-    double scroll_offset = (num_samples - 1) % step + sample_progress;
+    double scroll_offset = (m_num_samples - 1) % step + sample_progress;
     const double data_width = view_width();
 
     const int visible_count = data_width / step;

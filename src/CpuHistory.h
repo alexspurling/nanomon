@@ -30,7 +30,7 @@ public:
 
     CpuHistory();
 
-    void sample(const Timestamp &timestamp);
+    int sample(const Timestamp &timestamp);
 
     int num_samples() const;
 

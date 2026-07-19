@@ -134,8 +134,11 @@ bool BetterCpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, co
         const double ndc_delta = -rel.x() * ndc_per_pixel;
         const double idx_delta = ndc_delta * m_window_width / 2.0;
 
-        for (auto &lg : m_line_graphs)
-            lg.pan(m_cpu_history.num_samples(), idx_delta);
+        const int num_samples = m_cpu_history.num_samples();
+        for (auto &lg : m_line_graphs) {
+            lg.set_num_samples(num_samples);
+            lg.pan(idx_delta);
+        }
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
 }
@@ -150,8 +153,10 @@ bool BetterCpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     constexpr double zoom_factor = 1.1;
     const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
 
+    const int num_samples = m_cpu_history.num_samples();
     for (auto &lg : m_line_graphs) {
-        lg.zoom(m_cpu_history.num_samples(), factor, mouse_ratio);
+        lg.set_num_samples(num_samples);
+        lg.zoom(factor, mouse_ratio);
     }
 
     m_window_width = m_line_graphs[0].view_width();
@@ -199,25 +204,26 @@ void BetterCpuGraph::draw_grid(const std::vector<float> &vertices) {
 void BetterCpuGraph::draw_contents() {
     using namespace nanogui;
 
-    int num_samples = m_cpu_history.num_samples();
-
     // ---- 1. sample at fixed interval ----
     if (m_frame_count % m_sample_interval == 0) {
-        m_cpu_history.sample(std::chrono::system_clock::now());
-        num_samples = m_cpu_history.num_samples();
+        const int num_samples = m_cpu_history.sample(std::chrono::system_clock::now());
+
+        for (auto &lg : m_line_graphs) {
+            lg.set_num_samples(num_samples);
+        }
 
         // ---- 2. auto-scroll (when not paused) ----
         if (!m_paused) {
             for (auto &lg : m_line_graphs) {
-                lg.add_sample(num_samples);
+                lg.add_sample();
             }
         }
         for (auto &lg : m_line_graphs) {
-            lg.update_points(num_samples);
+            lg.update_points();
         }
     }
     for (auto &lg : m_line_graphs) {
-        lg.update_scroll(num_samples, static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
+        lg.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
