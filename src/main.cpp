@@ -69,7 +69,7 @@ public:
         m_step_label = new Label(this, "step: --", "sans-bold");
         m_count_label = new Label(this, "count: --", "sans-bold");
         m_data_width_label = new Label(this, "data_width: --", "sans-bold");
-        m_graph_width_label = new Label(this, "graph_width: --", "sans-bold");
+        m_scroll_offset_label = new Label(this, "scroll_offset: --", "sans-bold");
 
         {
             Widget *start_row = new Widget(this);
@@ -246,8 +246,8 @@ public:
             m_start_label->set_caption(oss.str());
             oss.str(""); oss << "end: " << s.end;
             m_end_label->set_caption(oss.str());
-            oss.str(""); oss << "graph_width: " << s.graph_width;
-            m_graph_width_label->set_caption(oss.str());
+            oss.str(""); oss << "scroll_offset: " << s.scroll_offset;
+            m_scroll_offset_label->set_caption(oss.str());
         }
 
         /* Draw the user interface */
@@ -286,7 +286,7 @@ private:
     Label *m_data_width_label = nullptr;
     Label *m_start_label = nullptr;
     Label *m_end_label = nullptr;
-    Label *m_graph_width_label = nullptr;
+    Label *m_scroll_offset_label = nullptr;
     Button *m_start_dec = nullptr;
     Button *m_start_inc = nullptr;
     Button *m_end_dec = nullptr;

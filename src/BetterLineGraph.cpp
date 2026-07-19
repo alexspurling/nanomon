@@ -114,7 +114,7 @@ void BetterLineGraph::update_points() {
     m_last_stats.data_width    = data_width;
     m_last_stats.start         = m_view_start;
     m_last_stats.end           = m_view_end;
-    m_last_stats.graph_width   = m_scroll_offset;
+    m_last_stats.scroll_offset = m_scroll_offset;
 
     // We need at least sample_window_size + step samples in order to create two points to form a line-segment
     if (m_num_samples <= sample_window_size + step) {
@@ -168,5 +168,5 @@ void BetterLineGraph::update_scroll(const double sample_progress) {
     const int visible_count = data_width / step;
     const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
     m_scroll_offset = scroll_offset * graph_screen_width / data_width;
-    m_last_stats.graph_width = m_scroll_offset;
+    m_last_stats.scroll_offset = m_scroll_offset;
 }

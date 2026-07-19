@@ -14,7 +14,7 @@ struct LineGraphStats {
     double data_width = 0.0;
     double start = 0.0;
     double end = 0.0;
-    double graph_width = 0.0;
+    double scroll_offset = 0.0;
 };
 
 /**
