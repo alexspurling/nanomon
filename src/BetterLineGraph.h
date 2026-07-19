@@ -121,4 +121,5 @@ private:
 
     LineGraphStats m_last_stats;
     double m_scroll_offset = 0.0;
+    double m_pan_offset = 0.0;
 };

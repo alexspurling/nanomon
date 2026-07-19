@@ -45,6 +45,22 @@ void BetterLineGraph::set_view_window(const double view_start, const double view
     m_view_end = std::min(max_end, static_cast<int>(view_end / step) * step);
     m_view_start = m_view_end - static_cast<int>((view_end - view_start) / step) * step;
 
+    const double original_half_width = (view_end - view_start) / 2.0;
+    const double original_center = view_start + original_half_width;
+    const double offset_by = view_start - m_view_start;
+
+    // std::cout << "pan offset: " << m_pan_offset << std::endl;
+
+    const double new_offset_by = ((view_start + view_end) - (m_view_start + m_view_end)) / 2.0;
+
+    const double actual_center = m_view_start + (m_view_end - m_view_start) / 2.0 + new_offset_by;
+
+    m_pan_offset += new_offset_by;
+
+    std::cout << "original center: " << original_center << ", actual center: " << actual_center <<
+        ", new_offset_by: " << new_offset_by << ", total_offset: " << m_pan_offset <<
+        std::endl;
+
     // std::cout << "view_start: " << view_start << ", view_end: " << view_end <<
     //     ", actual_start: " << actual_start << ", max_end: " << max_end <<
     //     ", m_view_start: " << m_view_start << ", m_view_end: " << m_view_end << std::endl;
@@ -98,6 +114,7 @@ void BetterLineGraph::update_points() {
     m_last_stats.data_width    = data_width;
     m_last_stats.start         = m_view_start;
     m_last_stats.end           = m_view_end;
+    m_last_stats.graph_width   = m_scroll_offset;
 
     // We need at least sample_window_size + step samples in order to create two points to form a line-segment
     if (m_num_samples <= sample_window_size + step) {
@@ -134,7 +151,6 @@ void BetterLineGraph::update_points() {
     }
 
     m_last_stats.count = m_vertices.size() / 2;
-    m_last_stats.graph_width = m_vertices[m_vertices.size() - 2] - m_vertices[0];
 
     // std::cout << "visible_count: " << visible_count << ", graph_screen_width: " << graph_screen_width <<
     //     ", x n-2: " << m_vertices[m_vertices.size() - 4] << ", x n-1: " << m_vertices[m_vertices.size() - 2] << std::endl;
@@ -146,10 +162,11 @@ void BetterLineGraph::update_scroll(const double sample_progress) {
 
     // sample_progress is a number between 0 and 1 representing how far we are between two sample intervals
     // scroll_offset is a number between 0 and step representing how far we are between two step intervals
-    double scroll_offset = (m_num_samples - 1) % step + sample_progress;
+    double scroll_offset = (m_num_samples - 1) % step + sample_progress + m_pan_offset;
     const int data_width = view_width();
 
     const int visible_count = data_width / step;
     const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
     m_scroll_offset = scroll_offset * graph_screen_width / data_width;
+    m_last_stats.graph_width = m_scroll_offset;
 }
