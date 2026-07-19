@@ -53,16 +53,16 @@ public:
     void pan(double delta_idx);
 
     void set_view_window(double view_start, double view_end);
-    void set_view_start(double start);
-    void set_view_end(double end);
+    void set_view_start(int start);
+    void set_view_end(int end);
 
     void zoom(double factor, double mouse_ratio);
 
     // ---- accessors ----
 
-    double view_start() const { return m_view_start; }
-    double view_end()   const { return m_view_end; }
-    double view_width() const { return m_view_end - m_view_start; }
+    [[nodiscard]] int view_start() const { return m_view_start; }
+    [[nodiscard]] int view_end()   const { return m_view_end; }
+    [[nodiscard]] int view_width() const { return m_view_end - m_view_start; }
 
     void set_num_samples(int n) { m_num_samples = n; }
 
@@ -98,13 +98,13 @@ public:
      */
     void add_sample();
 
-    int calculate_step(int start, int end) const;
+    [[nodiscard]] int calculate_step(int start, int end) const;
 
     void update_points();
 
     void update_scroll(double sample_progress);
 
-    double get_scroll_offset() {
+    [[nodiscard]] double get_scroll_offset() const {
         return m_scroll_offset;
     }
 

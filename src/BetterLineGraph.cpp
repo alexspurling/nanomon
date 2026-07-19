@@ -50,12 +50,12 @@ void BetterLineGraph::set_view_window(const double view_start, const double view
     //     ", m_view_start: " << m_view_start << ", m_view_end: " << m_view_end << std::endl;
 }
 
-void BetterLineGraph::set_view_start(const double start) {
+void BetterLineGraph::set_view_start(const int start) {
     m_view_start = start;
     m_last_stats.start = start;
 }
 
-void BetterLineGraph::set_view_end(const double end) {
+void BetterLineGraph::set_view_end(const int end) {
     m_view_end = end;
     m_last_stats.end = end;
 }
@@ -88,7 +88,7 @@ void BetterLineGraph::update_points() {
     // const int visible_count = last_idx - first_idx + 1;
     // const int count = (visible_count + step - 1) / step; // ceil division
 
-    const double data_width = view_width();
+    const int data_width = view_width();
 
     // Store stats
     m_last_stats.total_samples = m_num_samples;
@@ -147,7 +147,7 @@ void BetterLineGraph::update_scroll(const double sample_progress) {
     // sample_progress is a number between 0 and 1 representing how far we are between two sample intervals
     // scroll_offset is a number between 0 and step representing how far we are between two step intervals
     double scroll_offset = (m_num_samples - 1) % step + sample_progress;
-    const double data_width = view_width();
+    const int data_width = view_width();
 
     const int visible_count = data_width / step;
     const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
