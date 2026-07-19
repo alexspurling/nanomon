@@ -14,7 +14,7 @@ BetterLineGraph::BetterLineGraph(
     , m_max_vertices(max_vertices){}
 
 void BetterLineGraph::pan(const double delta_idx) {
-    std::cout << "pan: " << delta_idx << std::endl;
+    // std::cout << "pan: " << delta_idx << std::endl;
     // Pan relative to the true fractional position so sub-sample deltas accumulate
     const double view_start = m_view_start + m_pan_offset;
     const double view_end = m_view_end + m_pan_offset;

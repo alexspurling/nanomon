@@ -119,9 +119,11 @@ bool BetterCpuGraph::mouse_button_event(const Vector2i &p, int button,
             m_dragging = true;
             m_was_paused_before_drag = m_paused;
             m_paused = true;
+            std::cout << "m_paused: " << m_paused << ", m_was_paused_before_drag: " << m_was_paused_before_drag << std::endl;
         } else if (m_dragging) {
             m_dragging = false;
             m_paused = m_was_paused_before_drag;
+            std::cout << "m_paused: " << m_paused << std::endl;
         }
     }
     return Canvas::mouse_button_event(p, button, down, modifiers);
@@ -222,8 +224,10 @@ void BetterCpuGraph::draw_contents() {
             lg.update_points();
         }
     }
-    for (auto &lg : m_line_graphs) {
-        lg.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
+    if (!m_paused) {
+        for (auto &lg : m_line_graphs) {
+            lg.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
+        }
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----

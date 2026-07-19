@@ -64,7 +64,7 @@ private:
 
     bool m_paused = false;
     bool m_dragging = false;
-    bool m_was_paused_before_drag = true;
+    bool m_was_paused_before_drag = false;
 
     int m_sample_interval;
     int m_frame_count = 0;
