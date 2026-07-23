@@ -5,7 +5,8 @@
 #include <nanogui/shader.h>
 
 #include "CpuHistory.h"
-#include "LineGraph.h"
+#include "ViewWindow.h"
+#include "VertexGenerator.h"
 
 using namespace nanogui;
 
@@ -24,7 +25,7 @@ public:
 
     /** Access per-core stats from the last vertex generation pass. */
     [[nodiscard]] const LineGraphStats& stats(const int core_id) const {
-        return m_line_graphs[core_id].last_stats();
+        return m_vertex_generators[core_id].last_stats();
     }
 
     bool mouse_button_event(const Vector2i &p, int button, bool down,
@@ -39,7 +40,8 @@ private:
     ref<Shader> m_shader;
     ref<Shader> m_grid_shader;
     CpuHistory m_cpu_history;
-    std::vector<LineGraph> m_line_graphs;
+    std::vector<ViewWindow> m_view_windows;
+    std::vector<VertexGenerator> m_vertex_generators;
 
     bool m_paused = false;
     bool m_dragging = false;

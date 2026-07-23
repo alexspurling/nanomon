@@ -1,9 +1,7 @@
 #include "CpuGraph.h"
 
-#include <chrono>
-#include <iostream>
-#include <nanogui/opengl.h>
 #include <nanogui/renderpass.h>
+#include <iostream>
 
 using nanogui::Vector3f;
 
@@ -45,12 +43,12 @@ static void render_line_strip(nanogui::Shader *shader,
                               const float x_offset,
                               const Vector3f &colour) {
     using namespace nanogui;
-    const size_t n = verts.size() / 2;
-    shader->set_buffer("points", VariableType::Float32, {n, 2}, verts.data());
+    const size_t num_verts = verts.size() / 2;
+    shader->set_buffer("points", VariableType::Float32, {num_verts, 2}, verts.data());
     shader->set_uniform("line_color", colour);
     shader->set_uniform("x_offset", x_offset);
     shader->begin();
-    shader->draw_array(Shader::PrimitiveType::LineStrip, 0, n, false);
+    shader->draw_array(Shader::PrimitiveType::LineStrip, 0, num_verts, false);
     shader->end();
 }
 
@@ -71,14 +69,15 @@ CpuGraph::CpuGraph(Widget *parent)
                                "better_cpu_graph_grid_shader",
                                VERT_SRC, FRAG_SRC);
 
-    // Discover core count and create one BetterLineGraph per core
+    // Discover core count and create one ViewWindow + VertexGenerator per core
     const auto stat = CpuTimesSampler::sample();
     const int num_cores = static_cast<int>(stat.size());
 
-    m_line_graphs.reserve(num_cores);
+    m_view_windows.reserve(num_cores);
+    m_vertex_generators.reserve(num_cores);
     for (int core_id = 0; core_id < num_cores; core_id++) {
-        m_line_graphs.emplace_back(
-            core_id,
+        m_view_windows.emplace_back(core_id, MAX_VERTICES);
+        m_vertex_generators.emplace_back(
             [this, core_id](const int prev_idx, const int curr_idx) -> double {
                 const CoreSample& prev = m_cpu_history.sample_at(core_id, prev_idx);
                 const CoreSample& curr = m_cpu_history.sample_at(core_id, curr_idx);
@@ -98,11 +97,12 @@ CpuGraph::CpuGraph(Widget *parent)
 // ---- layout ----
 
 void CpuGraph::perform_layout(NVGcontext *ctx) {
+    // Resize the canvas to fill the parent
     if (parent()) {
         set_position({0, 0});
         set_size(parent()->size());
     }
-    Widget::perform_layout(ctx);
+    Canvas::perform_layout(ctx);
 }
 
 void CpuGraph::draw(NVGcontext *ctx) {
@@ -118,11 +118,9 @@ bool CpuGraph::mouse_button_event(const Vector2i &p, int button,
             m_dragging = true;
             m_was_paused_before_drag = m_paused;
             m_paused = true;
-            std::cout << "m_paused: " << m_paused << ", m_was_paused_before_drag: " << m_was_paused_before_drag << std::endl;
         } else if (m_dragging) {
             m_dragging = false;
             m_paused = m_was_paused_before_drag;
-            std::cout << "m_paused: " << m_paused << std::endl;
         }
     }
     return Canvas::mouse_button_event(p, button, down, modifiers);
@@ -130,48 +128,47 @@ bool CpuGraph::mouse_button_event(const Vector2i &p, int button,
 
 bool CpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, const int button, const int modifiers) {
     if (button == 1 && m_dragging && m_size.x() > 0) {
-        // Convert pixel delta → NDC delta → sample-index delta
+        // Convert pixel delta to NDC delta to sample-index delta
         const double ndc_per_pixel = 2.0 / static_cast<double>(m_size.x());
         const double ndc_delta = -rel.x() * ndc_per_pixel;
         const double idx_delta = ndc_delta * m_window_width / 2.0;
 
         const int num_samples = m_cpu_history.num_samples();
-        for (auto &lg : m_line_graphs) {
-            lg.set_num_samples(num_samples);
-            lg.pan(idx_delta);
+        for (auto &vw : m_view_windows) {
+            vw.set_num_samples(num_samples);
+            vw.pan(idx_delta);
         }
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
 }
 
 bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
-    if (m_line_graphs.empty() || m_size.x() == 0)
+    if (m_view_windows.empty() || m_size.x() == 0)
         return Canvas::scroll_event(p, rel);
 
     // Find the sample index under the mouse cursor
-    // const double mouse_ndc = 2.0 * p.x() / static_cast<double>(m_size.x()) - 1.0;
     const double mouse_ratio = p.x() / static_cast<double>(m_size.x());
     constexpr double zoom_factor = 1.1;
     const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
 
     const int num_samples = m_cpu_history.num_samples();
-    for (auto &lg : m_line_graphs) {
-        lg.set_num_samples(num_samples);
-        lg.zoom(factor, mouse_ratio);
+    for (auto &vw : m_view_windows) {
+        vw.set_num_samples(num_samples);
+        vw.zoom(factor, mouse_ratio);
     }
 
-    m_window_width = m_line_graphs[0].view_width();
+    m_window_width = m_view_windows[0].view_width();
     return Canvas::scroll_event(p, rel);
 }
 
 void CpuGraph::nudge_start(const double delta) {
-    for (auto &lg : m_line_graphs)
-        lg.set_view_start(lg.view_start() + delta);
+    for (auto &vw : m_view_windows)
+        vw.set_view_start(vw.view_start() + delta);
 }
 
 void CpuGraph::nudge_end(const double delta) {
-    for (auto &lg : m_line_graphs)
-        lg.set_view_end(lg.view_end() + delta);
+    for (auto &vw : m_view_windows)
+        vw.set_view_end(vw.view_end() + delta);
 }
 
 void CpuGraph::draw_grid(const std::vector<float> &vertices) {
@@ -209,45 +206,38 @@ void CpuGraph::draw_contents() {
     if (m_frame_count % m_sample_interval == 0) {
         const int num_samples = m_cpu_history.sample(std::chrono::system_clock::now());
 
-        for (auto &lg : m_line_graphs) {
-            lg.set_num_samples(num_samples);
+        for (auto &vw : m_view_windows) {
+            vw.set_num_samples(num_samples);
         }
 
         // ---- 2. auto-scroll (when not paused) ----
         if (!m_paused) {
-            for (auto &lg : m_line_graphs) {
-                lg.add_sample();
+            for (auto &vw : m_view_windows) {
+                vw.add_sample();
             }
-        }
-        for (auto &lg : m_line_graphs) {
-            lg.update_points();
         }
     }
     if (!m_paused) {
-        for (auto &lg : m_line_graphs) {
-            lg.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
+        for (auto &vw : m_view_windows) {
+            vw.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
         }
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
-    const auto first_verts = m_line_graphs[0].get_vertices();
+    const int num_samples = m_cpu_history.num_samples();
+    auto first_verts = m_vertex_generators[0].generate_vertices(m_view_windows[0], num_samples);
     if (first_verts.empty())
         return;
 
     draw_grid(first_verts);
 
-    // render_line_strip(m_shader, first_verts, core_colours[0 % num_colours]);
-
     // ---- 4. render each core's line strip ----
-    for (size_t i = 0; i < m_line_graphs.size(); ++i) {
-        const auto verts = m_line_graphs[i].get_vertices();
+    for (size_t i = 0; i < m_view_windows.size(); ++i) {
+        std::vector<float> verts = m_vertex_generators[i].generate_vertices(m_view_windows[i], num_samples);
         if (verts.empty()) {
             continue;
         }
-        const double scroll_offset = m_line_graphs[i].get_scroll_offset();
-        // if (i == 0) {
-        //     std::cout << "scroll offset: " << scroll_offset << ", frame: " << m_frame_count % m_sample_interval << std::endl;
-        // }
+        const double scroll_offset = m_view_windows[i].get_scroll_offset();
         render_line_strip(m_shader, verts, static_cast<float>(scroll_offset), core_colours[i % num_colours]);
     }
     m_frame_count++;

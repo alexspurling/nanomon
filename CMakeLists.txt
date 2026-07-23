@@ -48,7 +48,8 @@ add_executable(nanomon src/main.cpp
         src/CpuTimesSampler.cpp
         src/CpuHistory.cpp
         src/CpuGraph.cpp
-        src/LineGraph.cpp
+        src/ViewWindow.cpp
+        src/VertexGenerator.cpp
 )
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)

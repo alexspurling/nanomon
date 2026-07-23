@@ -80,9 +80,9 @@ public:
         // Pause button row
         Widget *pause_row = new Widget(this);
         pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
-        Button *pause_button = new Button(pause_row, "Resume");
+        Button *pause_button = new Button(pause_row, "Pause");
         pause_button->set_flags(Button::ToggleButton);
-        pause_button->set_pushed(true);
+        pause_button->set_pushed(false);
         pause_button->set_change_callback([this, pause_button](bool pushed) {
             m_cpu_graph2->set_paused(pushed);
             pause_button->set_caption(pushed ? "Resume" : "Pause");

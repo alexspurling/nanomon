@@ -14,12 +14,10 @@ struct LineGraphStats {
     double scroll_offset = 0.0;
 };
 
-class LineGraph {
+class ViewWindow {
 public:
-    LineGraph(int core_id,
-                    std::function<double(int prev_idx, int curr_idx)> sample_fn,
-                    int sample_window_size = 2,
-                    int max_vertices = 50);
+    ViewWindow(int core_id,
+               int max_vertices = 50);
 
     // ---- window management ----
 
@@ -37,24 +35,13 @@ public:
     [[nodiscard]] int view_start() const { return m_view_start; }
     [[nodiscard]] int view_end()   const { return m_view_end; }
     [[nodiscard]] int view_width() const { return m_view_end - m_view_start; }
+    [[nodiscard]] int num_samples() const { return m_num_samples; }
 
     void set_num_samples(int n) { m_num_samples = n; }
 
-    // ---- vertex generation ----
-
-    std::vector<float> get_vertices() {
-        return m_vertices;
-    }
-
-    [[nodiscard]] const LineGraphStats& last_stats() const {
-        return m_last_stats;
-    }
+    [[nodiscard]] int calculate_step() const;
 
     void add_sample();
-
-    [[nodiscard]] int calculate_step(int start, int end) const;
-
-    void update_points();
 
     void update_scroll(double sample_progress);
 
@@ -66,16 +53,12 @@ private:
     void update_offset();
 
     int m_core_id;
-    std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
-    int m_min_sample_window_size;
     int m_max_vertices;
     int m_num_samples = 0;
-    std::vector<float> m_vertices;
 
     int m_view_start = -12;
     int m_view_end   = -2;
 
-    LineGraphStats m_last_stats;
     double m_scroll_offset = 0.0;
     double m_pan_offset = 0.0;
     // Auto-scroll progress within the current step, in sample units [0, step)
