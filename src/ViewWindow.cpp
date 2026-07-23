@@ -1,13 +1,9 @@
 #include "ViewWindow.h"
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 
-ViewWindow::ViewWindow(
-        const int core_id,
-        const int max_vertices)
-    : m_core_id(core_id)
-    , m_max_vertices(max_vertices){}
+ViewWindow::ViewWindow(const int max_vertices)
+    : m_max_vertices(max_vertices){}
 
 void ViewWindow::pan(const double delta_idx) {
     // Pan relative to the true fractional position so sub-sample deltas accumulate
@@ -41,6 +37,10 @@ void ViewWindow::set_view_window(const double view_start, const double view_end)
     m_pan_offset = view_start - start_floor;
     // Preserve the requested width rather than flooring both ends independently
     m_view_end = m_view_start + static_cast<int>(std::lround(view_end - view_start));
+
+    m_graph_stats.data_width = this->view_width();
+    m_graph_stats.start = this->view_start();
+    m_graph_stats.end = this->view_end();
 }
 
 void ViewWindow::set_view_start(const int start) {
@@ -64,6 +64,9 @@ void ViewWindow::add_sample() {
         m_view_end += step;
         m_view_start += step;
     }
+
+    // Store stats
+    m_graph_stats.step = step;
 }
 
 void ViewWindow::update_scroll(const double sample_progress) {
@@ -99,4 +102,6 @@ void ViewWindow::update_offset() {
     const int visible_count = data_width / step;
     const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
     m_scroll_offset = scroll_offset * graph_screen_width / data_width;
+
+    m_graph_stats.scroll_offset = get_scroll_offset();
 }

@@ -17,13 +17,8 @@ public:
      */
     std::vector<float> generate_vertices(const ViewWindow& window, int num_samples);
 
-    [[nodiscard]] const LineGraphStats& last_stats() const {
-        return m_last_stats;
-    }
-
 private:
     std::function<double(int prev_idx, int curr_idx)> m_sample_fn;
     int m_min_sample_window_size;
     int m_max_vertices;
-    LineGraphStats m_last_stats;
 };

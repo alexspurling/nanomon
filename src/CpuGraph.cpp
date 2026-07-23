@@ -69,14 +69,12 @@ CpuGraph::CpuGraph(Widget *parent)
                                "better_cpu_graph_grid_shader",
                                VERT_SRC, FRAG_SRC);
 
-    // Discover core count and create one ViewWindow + VertexGenerator per core
+    // Discover core count and create one VertexGenerator per core
     const auto stat = CpuTimesSampler::sample();
     const int num_cores = static_cast<int>(stat.size());
 
-    m_view_windows.reserve(num_cores);
     m_vertex_generators.reserve(num_cores);
     for (int core_id = 0; core_id < num_cores; core_id++) {
-        m_view_windows.emplace_back(core_id, MAX_VERTICES);
         m_vertex_generators.emplace_back(
             [this, core_id](const int prev_idx, const int curr_idx) -> double {
                 const CoreSample& prev = m_cpu_history.sample_at(core_id, prev_idx);
@@ -133,17 +131,14 @@ bool CpuGraph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, const in
         const double ndc_delta = -rel.x() * ndc_per_pixel;
         const double idx_delta = ndc_delta * m_window_width / 2.0;
 
-        const int num_samples = m_cpu_history.num_samples();
-        for (auto &vw : m_view_windows) {
-            vw.set_num_samples(num_samples);
-            vw.pan(idx_delta);
-        }
+        m_view_window.set_num_samples(m_cpu_history.num_samples());
+        m_view_window.pan(idx_delta);
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
 }
 
 bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
-    if (m_view_windows.empty() || m_size.x() == 0)
+    if (m_vertex_generators.empty() || m_size.x() == 0)
         return Canvas::scroll_event(p, rel);
 
     // Find the sample index under the mouse cursor
@@ -151,24 +146,19 @@ bool CpuGraph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     constexpr double zoom_factor = 1.1;
     const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
 
-    const int num_samples = m_cpu_history.num_samples();
-    for (auto &vw : m_view_windows) {
-        vw.set_num_samples(num_samples);
-        vw.zoom(factor, mouse_ratio);
-    }
+    m_view_window.set_num_samples(m_cpu_history.num_samples());
+    m_view_window.zoom(factor, mouse_ratio);
 
-    m_window_width = m_view_windows[0].view_width();
+    m_window_width = m_view_window.view_width();
     return Canvas::scroll_event(p, rel);
 }
 
 void CpuGraph::nudge_start(const double delta) {
-    for (auto &vw : m_view_windows)
-        vw.set_view_start(vw.view_start() + delta);
+    m_view_window.set_view_start(m_view_window.view_start() + delta);
 }
 
 void CpuGraph::nudge_end(const double delta) {
-    for (auto &vw : m_view_windows)
-        vw.set_view_end(vw.view_end() + delta);
+    m_view_window.set_view_end(m_view_window.view_end() + delta);
 }
 
 void CpuGraph::draw_grid(const std::vector<float> &vertices) {
@@ -206,38 +196,35 @@ void CpuGraph::draw_contents() {
     if (m_frame_count % m_sample_interval == 0) {
         const int num_samples = m_cpu_history.sample(std::chrono::system_clock::now());
 
-        for (auto &vw : m_view_windows) {
-            vw.set_num_samples(num_samples);
-        }
+        m_view_window.set_num_samples(num_samples);
 
         // ---- 2. auto-scroll (when not paused) ----
         if (!m_paused) {
-            for (auto &vw : m_view_windows) {
-                vw.add_sample();
-            }
+            m_view_window.add_sample();
         }
     }
     if (!m_paused) {
-        for (auto &vw : m_view_windows) {
-            vw.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
-        }
+        m_view_window.update_scroll(static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
     }
 
     // ---- 3. generate vertices for the first core (also used for grid) ----
     const int num_samples = m_cpu_history.num_samples();
-    auto first_verts = m_vertex_generators[0].generate_vertices(m_view_windows[0], num_samples);
+    auto first_verts = m_vertex_generators[0].generate_vertices(m_view_window, num_samples);
+
+    m_view_window.m_graph_stats.vertex_count = static_cast<int>(first_verts.size() / 2);
+
     if (first_verts.empty())
         return;
 
     draw_grid(first_verts);
 
     // ---- 4. render each core's line strip ----
-    for (size_t i = 0; i < m_view_windows.size(); ++i) {
-        std::vector<float> verts = m_vertex_generators[i].generate_vertices(m_view_windows[i], num_samples);
+    for (size_t i = 0; i < m_vertex_generators.size(); ++i) {
+        std::vector<float> verts = m_vertex_generators[i].generate_vertices(m_view_window, num_samples);
         if (verts.empty()) {
             continue;
         }
-        const double scroll_offset = m_view_windows[i].get_scroll_offset();
+        const double scroll_offset = m_view_window.get_scroll_offset();
         render_line_strip(m_shader, verts, static_cast<float>(scroll_offset), core_colours[i % num_colours]);
     }
     m_frame_count++;

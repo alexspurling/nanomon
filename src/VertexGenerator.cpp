@@ -15,19 +15,8 @@ std::vector<float> VertexGenerator::generate_vertices(
     const int sample_window_size = std::max(m_min_sample_window_size, step);
     const int data_width = window.view_width();
 
-    // Store stats
-    m_last_stats.total_samples = num_samples;
-    m_last_stats.excess_samples = num_samples - window.view_end();
-    m_last_stats.step          = step;
-    m_last_stats.count         = 0;
-    m_last_stats.data_width    = data_width;
-    m_last_stats.start         = window.view_start();
-    m_last_stats.end           = window.view_end();
-    m_last_stats.scroll_offset = window.get_scroll_offset();
-
     // We need at least sample_window_size + step samples in order to create two points to form a line-segment
     if (num_samples <= sample_window_size + step) {
-        m_last_stats = {};
         return {};
     }
 
@@ -56,8 +45,6 @@ std::vector<float> VertexGenerator::generate_vertices(
         vertices.push_back(x);
         vertices.push_back(y);
     }
-
-    m_last_stats.count = static_cast<int>(vertices.size() / 2);
 
     return vertices;
 }

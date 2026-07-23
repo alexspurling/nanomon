@@ -166,7 +166,7 @@ public:
             m_visible_count_label->set_caption(oss.str());
             oss.str(""); oss << "step: " << s.step;
             m_step_label->set_caption(oss.str());
-            oss.str(""); oss << "count: " << s.count;
+            oss.str(""); oss << "vertex count: " << s.vertex_count;
             m_count_label->set_caption(oss.str());
             oss.str(""); oss << "data_width: " << s.data_width;
             m_data_width_label->set_caption(oss.str());
