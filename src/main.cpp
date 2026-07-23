@@ -9,7 +9,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "CpuGraph.h"
+#include "MultiCpuGraph.h"
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
 
@@ -45,7 +45,7 @@ public:
 
         Widget *cpu_graph_container = new Widget(this);
         cpu_graph_container->set_fixed_height(250);
-        m_cpu_graph2 = new CpuGraph(cpu_graph_container);
+        m_cpu_graph = new MultiCpuGraph(cpu_graph_container);
 
         // Labels below cpu_graph2 showing BetterLineGraph stats
         m_total_samples_label = new Label(this, "total_samples: --", "sans-bold");
@@ -62,8 +62,8 @@ public:
             m_start_label = new Label(start_row, "start: --", "sans-bold");
             m_start_label->set_fixed_width(100);
             m_start_inc = new Button(start_row, "+");
-            m_start_dec->set_callback([this] { m_cpu_graph2->nudge_start(-1.0); });
-            m_start_inc->set_callback([this] { m_cpu_graph2->nudge_start(1.0); });
+            m_start_dec->set_callback([this] { m_cpu_graph->nudge_start(-1.0); });
+            m_start_inc->set_callback([this] { m_cpu_graph->nudge_start(1.0); });
         }
 
         {
@@ -73,8 +73,8 @@ public:
             m_end_label = new Label(end_row, "end: --", "sans-bold");
             m_end_label->set_fixed_width(100);
             m_end_inc = new Button(end_row, "+");
-            m_end_dec->set_callback([this] { m_cpu_graph2->nudge_end(-1.0); });
-            m_end_inc->set_callback([this] { m_cpu_graph2->nudge_end(1.0); });
+            m_end_dec->set_callback([this] { m_cpu_graph->nudge_end(-1.0); });
+            m_end_inc->set_callback([this] { m_cpu_graph->nudge_end(1.0); });
         }
 
         // Pause button row
@@ -84,7 +84,7 @@ public:
         pause_button->set_flags(Button::ToggleButton);
         pause_button->set_pushed(false);
         pause_button->set_change_callback([this, pause_button](bool pushed) {
-            m_cpu_graph2->set_paused(pushed);
+            m_cpu_graph->set_paused(pushed);
             pause_button->set_caption(pushed ? "Resume" : "Pause");
         });
 
@@ -157,9 +157,9 @@ public:
 
     void draw(NVGcontext *ctx) override {
         // Update stats labels from CpuGraph (always, even when paused)
-        if (m_cpu_graph2 && m_total_samples_label) {
+        if (m_cpu_graph && m_total_samples_label) {
             std::ostringstream oss;
-            const auto &s = m_cpu_graph2->stats(0);
+            const auto &s = m_cpu_graph->stats(0);
             oss.str(""); oss << "total_samples: " << s.total_samples;
             m_total_samples_label->set_caption(oss.str());
             oss.str(""); oss << "excess_samples: " << s.excess_samples;
@@ -206,7 +206,7 @@ public:
     }
 private:
     Label *m_coord_label;
-    CpuGraph *m_cpu_graph2 = nullptr;
+    MultiCpuGraph *m_cpu_graph = nullptr;
     Label *m_total_samples_label = nullptr;
     Label *m_visible_count_label = nullptr;
     Label *m_step_label = nullptr;

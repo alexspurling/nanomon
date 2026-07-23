@@ -50,6 +50,7 @@ add_executable(nanomon src/main.cpp
         src/CpuGraph.cpp
         src/ViewWindow.cpp
         src/VertexGenerator.cpp
+        src/MultiCpuGraph.cpp
 )
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)
