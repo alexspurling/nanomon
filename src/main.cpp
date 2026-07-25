@@ -26,11 +26,6 @@ public:
 
         this->set_layout(new GroupLayout());
 
-        // ---- data sources ----
-        m_cpu_source    = std::make_unique<CpuDataSource>();
-        m_mem_source    = std::make_unique<MemoryDataSource>();
-        m_disk_source   = std::make_unique<DiskDataSource>();
-
         // ---- tab bar ----
         Widget *tab_group = new Widget(this);
         tab_group->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
@@ -38,49 +33,59 @@ public:
         Button *btn_cpu = new Button(tab_group, "CPU");
         btn_cpu->set_flags(Button::RadioButton);
         btn_cpu->set_pushed(true);
-        btn_cpu->set_callback([this] { switch_source(m_cpu_source.get()); });
-
         Button *btn_mem = new Button(tab_group, "Memory");
         btn_mem->set_flags(Button::RadioButton);
-        btn_mem->set_callback([this] { switch_source(m_mem_source.get()); });
-
         Button *btn_disk = new Button(tab_group, "Disk");
         btn_disk->set_flags(Button::RadioButton);
-        btn_disk->set_callback([this] { switch_source(m_disk_source.get()); });
 
-        // ---- graph ----
+        // ---- graphs ----
         Widget *graph_container = new Widget(this);
         graph_container->set_fixed_height(250);
-        m_graph = new Graph(graph_container, m_cpu_source.get());
+
+        m_cpu_graph = new Graph(graph_container, std::make_unique<CpuDataSource>());
+        m_memory_graph = new Graph(graph_container, std::make_unique<MemoryDataSource>());
+        m_disk_graph = new Graph(graph_container, std::make_unique<DiskDataSource>());
+
+        // Only make the CPU graph visible for now
+        m_cpu_graph->set_visible(true);
+        m_memory_graph->set_visible(false);
+        m_disk_graph->set_visible(false);
+        m_current_graph = m_cpu_graph;
 
         // ---- stats labels ----
-        m_total_samples_label  = new Label(this, "", "sans-bold");
-        m_excess_samples_label = new Label(this, "", "sans-bold");
-        m_step_label           = new Label(this, "", "sans-bold");
-        m_vertex_count_label   = new Label(this, "", "sans-bold");
-        m_data_width_label     = new Label(this, "", "sans-bold");
-        m_scroll_offset_label  = new Label(this, "", "sans-bold");
+        // It's important to set an initial caption because nanogui uses this to determine the size of the labels. If
+        // we were to set the initial caption to "", then the initial width would be 0
+        m_total_samples_label  = new Label(this, "total_samples: --", "sans-bold");
+        m_excess_samples_label = new Label(this, "excess_samples: --", "sans-bold");
+        m_step_label           = new Label(this, "step: --", "sans-bold");
+        m_vertex_count_label   = new Label(this, "vertex_count: --", "sans-bold");
+        m_data_width_label     = new Label(this, "data_width: --", "sans-bold");
+        m_scroll_offset_label  = new Label(this, "scroll_offset: --", "sans-bold");
 
         {
             Widget *start_row = new Widget(this);
             start_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
             m_start_dec = new Button(start_row, "-");
-            m_start_label = new Label(start_row, "", "sans-bold");
+            m_start_label = new Label(start_row, "start: --", "sans-bold");
             m_start_label->set_fixed_width(100);
             m_start_inc = new Button(start_row, "+");
-            m_start_dec->set_callback([this] { m_graph->nudge_start(-1.0); });
-            m_start_inc->set_callback([this] { m_graph->nudge_start(1.0); });
+            m_start_dec->set_callback([this] {
+                m_current_graph->nudge_start(-1.0);
+            });
+            m_start_inc->set_callback([this] {
+                m_current_graph->nudge_start(1.0);
+            });
         }
 
         {
             Widget *end_row = new Widget(this);
             end_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
             m_end_dec = new Button(end_row, "-");
-            m_end_label = new Label(end_row, "", "sans-bold");
+            m_end_label = new Label(end_row, "end: --", "sans-bold");
             m_end_label->set_fixed_width(100);
             m_end_inc = new Button(end_row, "+");
-            m_end_dec->set_callback([this] { m_graph->nudge_end(-1.0); });
-            m_end_inc->set_callback([this] { m_graph->nudge_end(1.0); });
+            m_end_dec->set_callback([this] { m_current_graph->nudge_end(-1.0); });
+            m_end_inc->set_callback([this] { m_current_graph->nudge_end(1.0); });
         }
 
         // Pause button
@@ -90,8 +95,35 @@ public:
         pause_button->set_flags(Button::ToggleButton);
         pause_button->set_pushed(false);
         pause_button->set_change_callback([this, pause_button](bool pushed) {
-            m_graph->set_paused(pushed);
+            m_current_graph->set_paused(pushed);
             pause_button->set_caption(pushed ? "Resume" : "Pause");
+        });
+
+        btn_cpu->set_callback([this, pause_button] {
+            m_cpu_graph->set_visible(true);
+            m_memory_graph->set_visible(false);
+            m_disk_graph->set_visible(false);
+            m_current_graph = m_cpu_graph;
+            pause_button->set_pushed(m_current_graph->paused());
+            pause_button->set_caption(pause_button->pushed() ? "Resume" : "Pause");
+        });
+
+        btn_mem->set_callback([this, pause_button] {
+            m_cpu_graph->set_visible(false);
+            m_memory_graph->set_visible(true);
+            m_disk_graph->set_visible(false);
+            m_current_graph = m_memory_graph;
+            pause_button->set_pushed(m_current_graph->paused());
+            pause_button->set_caption(pause_button->pushed() ? "Resume" : "Pause");
+        });
+
+        btn_disk->set_callback([this, pause_button] {
+            m_cpu_graph->set_visible(false);
+            m_memory_graph->set_visible(false);
+            m_disk_graph->set_visible(true);
+            m_current_graph = m_disk_graph;
+            pause_button->set_pushed(m_current_graph->paused());
+            pause_button->set_caption(pause_button->pushed() ? "Resume" : "Pause");
         });
 
         VScrollPanel *panel = new VScrollPanel(this);
@@ -122,10 +154,6 @@ public:
         m_shader->set_uniform("intensity", .5f);
     }
 
-    void switch_source(DataSource *source) {
-        m_graph->set_data_source(source);
-    }
-
     bool resize_event(const Vector2i &size) override {
         perform_layout();
         return Screen::resize_event(size);
@@ -142,39 +170,42 @@ public:
     }
 
     void draw(NVGcontext *ctx) override {
-        if (m_graph) {
-            const auto &s = m_graph->stats();
-            std::ostringstream oss;
+        const auto &s = m_current_graph->stats();
+        std::ostringstream oss;
 
-            oss << "total_samples: " << s.total_samples;
-            m_total_samples_label->set_caption(oss.str());
+        oss << "total_samples: " << s.total_samples;
+        m_total_samples_label->set_caption(oss.str());
 
-            oss.str(""); oss << "excess_samples: " << s.excess_samples;
-            m_excess_samples_label->set_caption(oss.str());
+        oss.str(""); oss << "excess_samples: " << s.excess_samples;
+        m_excess_samples_label->set_caption(oss.str());
 
-            oss.str(""); oss << "step: " << s.step;
-            m_step_label->set_caption(oss.str());
+        oss.str(""); oss << "step: " << s.step;
+        m_step_label->set_caption(oss.str());
 
-            oss.str(""); oss << "vertex count: " << s.vertex_count;
-            m_vertex_count_label->set_caption(oss.str());
+        oss.str(""); oss << "vertex count: " << s.vertex_count;
+        m_vertex_count_label->set_caption(oss.str());
 
-            oss.str(""); oss << "data_width: " << s.data_width;
-            m_data_width_label->set_caption(oss.str());
+        oss.str(""); oss << "data_width: " << s.data_width;
+        m_data_width_label->set_caption(oss.str());
 
-            oss.str(""); oss << "start: " << s.start;
-            m_start_label->set_caption(oss.str());
+        oss.str(""); oss << "start: " << s.start;
+        m_start_label->set_caption(oss.str());
 
-            oss.str(""); oss << "end: " << s.end;
-            m_end_label->set_caption(oss.str());
+        oss.str(""); oss << "end: " << s.end;
+        m_end_label->set_caption(oss.str());
 
-            oss.str(""); oss << "scroll_offset: " << s.scroll_offset;
-            m_scroll_offset_label->set_caption(oss.str());
-        }
+        oss.str(""); oss << "scroll_offset: " << s.scroll_offset;
+        m_scroll_offset_label->set_caption(oss.str());
 
         Screen::draw(ctx);
     }
 
     void draw_contents() override {
+
+        m_cpu_graph->update();
+        m_memory_graph->update();
+        m_disk_graph->update();
+
         Matrix4f mvp = Matrix4f::scale(Vector3f(
                            (float) m_size.y() / (float) m_size.x() * 0.25f, 0.25f, 0.25f)) *
                        Matrix4f::rotate(Vector3f(0, 0, 1), (float) glfwGetTime());
@@ -192,17 +223,18 @@ public:
 
         if (m_frame_index % 60 == 59) {
             char caption[128];
-            snprintf(caption, 128, "NanoMON (%.2f FPS)", 1.f / m_frame_timer.value());
+            snprintf(caption, 128, "Nanomon (%.2f FPS)", 1.f / m_frame_timer.value());
             set_caption(caption);
         }
     }
 
 private:
-    std::unique_ptr<CpuDataSource>    m_cpu_source;
-    std::unique_ptr<MemoryDataSource> m_mem_source;
-    std::unique_ptr<DiskDataSource>   m_disk_source;
-
-    Graph *m_graph = nullptr;
+    // Apparently we have to use nanogui's ref type here because these objects will be referenced by the parent Widget
+    // It allows us to delegate destruction of these objects to nanogui on shutdown
+    ref<Graph> m_cpu_graph = nullptr;
+    ref<Graph> m_memory_graph = nullptr;
+    ref<Graph> m_disk_graph = nullptr;
+    ref<Graph> m_current_graph = nullptr;
 
     Label *m_total_samples_label  = nullptr;
     Label *m_excess_samples_label = nullptr;

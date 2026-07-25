@@ -26,46 +26,25 @@ void main() {
 //  Graph
 // ============================================================
 
-Graph::Graph(Widget *parent, DataSource *data_source)
-    : Canvas(parent, 1, true), m_data_source(data_source) {
+Graph::Graph(Widget *parent, std::unique_ptr<DataSource> data_source)
+    : Canvas(parent, 1, true), m_data_source(std::move(data_source)) {
 
     using namespace nanogui;
 
-    m_shader = new Shader(render_pass(),
-                          "graph_line_shader",
-                          VERT_SRC, FRAG_SRC);
-
-    m_grid_shader = new Shader(render_pass(),
-                               "graph_grid_shader",
-                               VERT_SRC, FRAG_SRC);
+    m_shader = new Shader(render_pass(), "graph_line_shader", VERT_SRC, FRAG_SRC);
+    m_grid_shader = new Shader(render_pass(), "graph_grid_shader", VERT_SRC, FRAG_SRC);
 
     render_pass()->set_depth_test(RenderPass::DepthTest::LessEqual, false);
 
     m_sample_interval = 60 / SAMPLE_FREQUENCY;
 
-    if (m_data_source) {
-        rebuild_vertex_generators();
-    }
-}
-
-void Graph::set_data_source(DataSource *source) {
-    m_data_source = source;
-    m_view_window = ViewWindow{MAX_VERTICES};
-    m_frame_count = 0;
-    if (m_data_source) {
-        rebuild_vertex_generators();
-    }
-}
-
-void Graph::rebuild_vertex_generators() {
-    m_vertex_generators.clear();
     const int n = m_data_source->num_series();
     m_vertex_generators.reserve(n);
 
     for (int i = 0; i < n; ++i) {
         const auto &cfg = m_data_source->series_config(i);
         m_vertex_generators.emplace_back(
-            [this, i](int prev_idx, int curr_idx) -> double {
+            [this, i](const int prev_idx, const int curr_idx) -> double {
                 return m_data_source->compute_value(i, prev_idx, curr_idx);
             },
             SAMPLE_WINDOW_SIZE,
@@ -106,9 +85,8 @@ bool Graph::mouse_button_event(const Vector2i &p, int button,
     return Canvas::mouse_button_event(p, button, down, modifiers);
 }
 
-bool Graph::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
-                              int button, int modifiers) {
-    if (button == 1 && m_dragging && m_size.x() > 0 && m_data_source) {
+bool Graph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, const int button, const int modifiers) {
+    if (button == 1 && m_dragging && m_size.x() > 0) {
         const double ndc_per_pixel = 2.0 / static_cast<double>(m_size.x());
         const double ndc_delta = -rel.x() * ndc_per_pixel;
         const double idx_delta = ndc_delta * m_view_window.view_width() / 2.0;
@@ -120,9 +98,6 @@ bool Graph::mouse_drag_event(const Vector2i &p, const Vector2i &rel,
 }
 
 bool Graph::scroll_event(const Vector2i &p, const Vector2f &rel) {
-    if (m_size.x() == 0 || !m_data_source)
-        return Canvas::scroll_event(p, rel);
-
     const double mouse_ratio = p.x() / static_cast<double>(m_size.x());
     constexpr double zoom_factor = 1.1;
     const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
@@ -133,11 +108,11 @@ bool Graph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     return Canvas::scroll_event(p, rel);
 }
 
-void Graph::nudge_start(double delta) {
+void Graph::nudge_start(const double delta) {
     m_view_window.set_view_start(m_view_window.view_start() + static_cast<int>(delta));
 }
 
-void Graph::nudge_end(double delta) {
+void Graph::nudge_end(const double delta) {
     m_view_window.set_view_end(m_view_window.view_end() + static_cast<int>(delta));
 }
 
@@ -169,11 +144,7 @@ void Graph::draw_grid(const std::vector<float> &vertices) {
     m_grid_shader->end();
 }
 
-void Graph::render_line_strip(Shader *shader,
-                               const std::vector<float> &verts,
-                               float x_offset,
-                               const Vector3f &colour) {
-    using namespace nanogui;
+void Graph::render_line_strip(Shader *shader, const std::vector<float> &verts, const float x_offset, const Vector3f &colour) {
     if (verts.empty())
         return;
 
@@ -187,13 +158,7 @@ void Graph::render_line_strip(Shader *shader,
 }
 
 // ---- per-frame update ----
-
-void Graph::draw_contents() {
-    using namespace nanogui;
-
-    if (!m_data_source)
-        return;
-
+void Graph::update() {
     // ---- 1. sample at fixed interval ----
     if (m_frame_count % m_sample_interval == 0) {
         m_data_source->sample();
@@ -209,8 +174,12 @@ void Graph::draw_contents() {
         m_view_window.update_scroll(
             static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
     }
+    m_frame_count++;
+}
 
-    // ---- 2. draw all series ----
+void Graph::draw_contents() {
+
+    // ---- draw all series ----
     const int n_samples = m_data_source->num_samples();
 
     // Generate vertices for the first series (used for grid)
@@ -223,7 +192,7 @@ void Graph::draw_contents() {
         const auto &cfg = m_data_source->series_config(0);
         first_gen.set_y_range(cfg.y_min, cfg.y_max);
     }
-    auto first_verts = first_gen.generate_vertices(m_view_window, n_samples);
+    const auto first_verts = first_gen.generate_vertices(m_view_window, n_samples);
     m_view_window.m_graph_stats.vertex_count = static_cast<int>(first_verts.size() / 2);
 
     if (first_verts.empty())
@@ -240,9 +209,7 @@ void Graph::draw_contents() {
         if (verts.empty())
             continue;
 
-        const float scroll_offset = static_cast<float>(m_view_window.get_scroll_offset());
+        const auto scroll_offset = static_cast<float>(m_view_window.get_scroll_offset());
         render_line_strip(m_shader, verts, scroll_offset, cfg.color);
     }
-
-    m_frame_count++;
 }

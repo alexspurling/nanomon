@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <nanogui/canvas.h>
 #include <nanogui/shader.h>
 
@@ -11,13 +12,7 @@ using namespace nanogui;
 
 class Graph : public Canvas {
 public:
-    /** Takes a non-owning pointer to a DataSource. Lifetime must exceed the Graph. */
-    explicit Graph(Widget *parent, DataSource *data_source);
-
-    /** Swap the data source (rebuilds vertex generators). */
-    void set_data_source(DataSource *source);
-
-    [[nodiscard]] DataSource* data_source() const { return m_data_source; }
+    Graph(Widget *parent, std::unique_ptr<DataSource> data_source);
 
     void perform_layout(NVGcontext *ctx) override;
     void draw(NVGcontext *ctx) override;
@@ -36,18 +31,19 @@ public:
                           int button, int modifiers) override;
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
+    void update();
+
 protected:
-    void rebuild_vertex_generators();
 
     void draw_grid(const std::vector<float> &vertices);
-    void render_line_strip(Shader *shader,
+    static void render_line_strip(Shader *shader,
                            const std::vector<float> &verts,
                            float x_offset,
                            const Vector3f &colour);
 
     ref<Shader> m_shader;
     ref<Shader> m_grid_shader;
-    DataSource *m_data_source = nullptr;
+    std::unique_ptr<DataSource> m_data_source;
     ViewWindow m_view_window{MAX_VERTICES};
     std::vector<VertexGenerator> m_vertex_generators;
 

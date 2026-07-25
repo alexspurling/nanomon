@@ -62,8 +62,8 @@ private:
     int m_max_vertices;
     int m_num_samples = 0;
 
-    int m_view_start = -12;
-    int m_view_end   = -2;
+    int m_view_start = -11;
+    int m_view_end   = -1;
 
     double m_scroll_offset = 0.0;
     double m_pan_offset = 0.0;

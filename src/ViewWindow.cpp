@@ -38,7 +38,8 @@ void ViewWindow::set_view_window(const double view_start, const double view_end)
     // Preserve the requested width rather than flooring both ends independently
     m_view_end = m_view_start + static_cast<int>(std::lround(view_end - view_start));
 
-    m_graph_stats.data_width = this->view_width();
+    m_graph_stats.step = calculate_step();
+    m_graph_stats.data_width = view_width();
     m_graph_stats.start = this->view_start();
     m_graph_stats.end = this->view_end();
 }
@@ -66,7 +67,9 @@ void ViewWindow::add_sample() {
     }
 
     // Store stats
-    m_graph_stats.step = step;
+    m_graph_stats.data_width = view_width();
+    m_graph_stats.start = view_start();
+    m_graph_stats.end = view_end();
 }
 
 void ViewWindow::update_scroll(const double sample_progress) {
