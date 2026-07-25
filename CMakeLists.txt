@@ -44,13 +44,15 @@ function(embed_shader TARGET SHADER_FILE)
     target_include_directories(${TARGET} PRIVATE ${CMAKE_BINARY_DIR}/generated)
 endfunction()
 
-add_executable(nanomon src/main.cpp
+add_executable(nanomon
+        src/main.cpp
         src/CpuTimesSampler.cpp
-        src/CpuHistory.cpp
-        src/CpuGraph.cpp
+        src/CpuDataSource.cpp
+        src/Graph.cpp
         src/ViewWindow.cpp
         src/VertexGenerator.cpp
-        src/MultiCpuGraph.cpp
+        src/MemoryDataSource.cpp
+        src/DiskDataSource.cpp
 )
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)

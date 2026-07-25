@@ -3,28 +3,32 @@
 #include <nanogui/canvas.h>
 #include <nanogui/shader.h>
 
-#include "CpuHistory.h"
+#include "DataSource.h"
+#include "VertexGenerator.h"
 #include "ViewWindow.h"
 
 using namespace nanogui;
 
-class CpuGraph : public Canvas {
+class Graph : public Canvas {
 public:
-    explicit CpuGraph(Widget *parent);
+    /** Takes a non-owning pointer to a DataSource. Lifetime must exceed the Graph. */
+    explicit Graph(Widget *parent, DataSource *data_source);
+
+    /** Swap the data source (rebuilds vertex generators). */
+    void set_data_source(DataSource *source);
+
+    [[nodiscard]] DataSource* data_source() const { return m_data_source; }
 
     void perform_layout(NVGcontext *ctx) override;
     void draw(NVGcontext *ctx) override;
     void draw_contents() override;
 
-    void set_paused(const bool paused) { m_paused = paused; }
+    void set_paused(bool paused) { m_paused = paused; }
     [[nodiscard]] bool paused() const { return m_paused; }
     void nudge_start(double delta);
     void nudge_end(double delta);
 
-    /** Access stats from the last vertex generation pass. */
-    virtual const GraphStats& stats(int core_id) const {
-        return m_view_window.get_stats();
-    }
+    [[nodiscard]] const GraphStats& stats() const { return m_view_window.get_stats(); }
 
     bool mouse_button_event(const Vector2i &p, int button, bool down,
                             int modifiers) override;
@@ -33,13 +37,9 @@ public:
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
 protected:
-    /** Subclass hook: draw the graph content (grid + line strips). */
-    virtual void draw_graph_content() = 0;
+    void rebuild_vertex_generators();
 
-    /** Draw vertical grid lines at the x positions of the given vertices. */
     void draw_grid(const std::vector<float> &vertices);
-
-    /** Upload and draw a single line strip. */
     void render_line_strip(Shader *shader,
                            const std::vector<float> &verts,
                            float x_offset,
@@ -47,11 +47,10 @@ protected:
 
     ref<Shader> m_shader;
     ref<Shader> m_grid_shader;
-    CpuHistory m_cpu_history;
+    DataSource *m_data_source = nullptr;
     ViewWindow m_view_window{MAX_VERTICES};
-    // Colour palette (shared by subclasses)
-    static const Vector3f CORE_COLOURS[8];
-    static const size_t NUM_COLOURS;
+    std::vector<VertexGenerator> m_vertex_generators;
+
     static const Vector3f GRID_COLOUR;
 
     bool m_paused = false;
@@ -63,4 +62,5 @@ protected:
 
     static constexpr int MAX_VERTICES = 50;
     static constexpr int SAMPLE_FREQUENCY = 1;
+    static constexpr int SAMPLE_WINDOW_SIZE = 2;
 };

@@ -4,10 +4,14 @@
 VertexGenerator::VertexGenerator(
         std::function<double(int prev_idx, int curr_idx)> sample_fn,
         const int sample_window_size,
-        const int max_vertices)
+        const int max_vertices,
+        const double y_min,
+        const double y_max)
     : m_sample_fn(std::move(sample_fn))
     , m_min_sample_window_size(sample_window_size)
-    , m_max_vertices(max_vertices) {}
+    , m_max_vertices(max_vertices)
+    , m_y_min(y_min)
+    , m_y_max(y_max) {}
 
 std::vector<float> VertexGenerator::generate_vertices(
         const ViewWindow& window, const int num_samples) {
@@ -31,6 +35,10 @@ std::vector<float> VertexGenerator::generate_vertices(
     const int visible_count = data_width / step;
     const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
 
+    // Guard against degenerate y-range
+    const double y_range = (m_y_max - m_y_min);
+    const double y_scale = (y_range > 0.0) ? 2.0 / y_range : 1.0;
+
     for (int sample_idx = first_idx; sample_idx <= last_idx; sample_idx += step) {
         const int prev_idx = std::max(0, sample_idx - sample_window_size);
         const double function_y = m_sample_fn(prev_idx, sample_idx);
@@ -39,8 +47,9 @@ std::vector<float> VertexGenerator::generate_vertices(
         const double t = (static_cast<double>(sample_idx) - window.view_start()) / data_width;
         const float x = static_cast<float>(t * graph_screen_width - 1.0);
 
-        // Map value [0, 1] to NDC y [-1, 1]
-        const float y = static_cast<float>(function_y) * 2.0f - 1.0f;
+        // Map value [y_min, y_max] to NDC y [-1, 1]
+        const double normalized = (function_y - m_y_min) * y_scale;
+        const float y = static_cast<float>(normalized - 1.0);
 
         vertices.push_back(x);
         vertices.push_back(y);

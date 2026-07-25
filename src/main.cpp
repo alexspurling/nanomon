@@ -7,9 +7,13 @@
 #include <nanogui/shader.h>
 #include <nanogui/renderpass.h>
 #include <iostream>
+#include <memory>
 #include <sstream>
 
-#include "MultiCpuGraph.h"
+#include "Graph.h"
+#include "CpuDataSource.h"
+#include "MemoryDataSource.h"
+#include "DiskDataSource.h"
 #include "simple_vert_shader.h"
 #include "simple_frag_shader.h"
 
@@ -17,129 +21,111 @@ using namespace nanogui;
 
 class ExampleApplication : public Screen {
 public:
-    ExampleApplication() : Screen(Vector2i(1024, 768), "NanoGUI Test") {
+    ExampleApplication() : Screen(Vector2i(1024, 768), "NanoMON") {
         inc_ref();
 
         this->set_layout(new GroupLayout());
 
-        /* No need to store a pointer, the data structure will be automatically
-           freed when the parent window is deleted */
-        // new Label(this, "Push buttons", "sans-bold");
+        // ---- data sources ----
+        m_cpu_source    = std::make_unique<CpuDataSource>();
+        m_mem_source    = std::make_unique<MemoryDataSource>();
+        m_disk_source   = std::make_unique<DiskDataSource>();
 
+        // ---- tab bar ----
         Widget *tab_group = new Widget(this);
         tab_group->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
 
-        Button *b = new Button(tab_group, "CPU");
-        b->set_flags(Button::RadioButton);
-        b->set_pushed(true);
-        b->set_callback([] { std::cout << "CPU pushed!" << std::endl; });
-        b = new Button(tab_group, "Memory");
-        b->set_callback([] { std::cout << "Memory pushed!" << std::endl; });
-        b->set_flags(Button::RadioButton);
-        b = new Button(tab_group, "GPU");
-        b->set_callback([] { std::cout << "GPU pushed!" << std::endl; });
-        b->set_flags(Button::RadioButton);
-        b = new Button(tab_group, "Disk");
-        b->set_callback([] { std::cout << "Disk pushed!" << std::endl; });
-        b->set_flags(Button::RadioButton);
+        Button *btn_cpu = new Button(tab_group, "CPU");
+        btn_cpu->set_flags(Button::RadioButton);
+        btn_cpu->set_pushed(true);
+        btn_cpu->set_callback([this] { switch_source(m_cpu_source.get()); });
 
-        Widget *cpu_graph_container = new Widget(this);
-        cpu_graph_container->set_fixed_height(250);
-        m_cpu_graph = new MultiCpuGraph(cpu_graph_container);
+        Button *btn_mem = new Button(tab_group, "Memory");
+        btn_mem->set_flags(Button::RadioButton);
+        btn_mem->set_callback([this] { switch_source(m_mem_source.get()); });
 
-        // Labels below cpu_graph2 showing BetterLineGraph stats
-        m_total_samples_label = new Label(this, "total_samples: --", "sans-bold");
-        m_visible_count_label = new Label(this, "visible_count: --", "sans-bold");
-        m_step_label = new Label(this, "step: --", "sans-bold");
-        m_count_label = new Label(this, "count: --", "sans-bold");
-        m_data_width_label = new Label(this, "data_width: --", "sans-bold");
-        m_scroll_offset_label = new Label(this, "scroll_offset: --", "sans-bold");
+        Button *btn_disk = new Button(tab_group, "Disk");
+        btn_disk->set_flags(Button::RadioButton);
+        btn_disk->set_callback([this] { switch_source(m_disk_source.get()); });
+
+        // ---- graph ----
+        Widget *graph_container = new Widget(this);
+        graph_container->set_fixed_height(250);
+        m_graph = new Graph(graph_container, m_cpu_source.get());
+
+        // ---- stats labels ----
+        m_total_samples_label  = new Label(this, "", "sans-bold");
+        m_excess_samples_label = new Label(this, "", "sans-bold");
+        m_step_label           = new Label(this, "", "sans-bold");
+        m_vertex_count_label   = new Label(this, "", "sans-bold");
+        m_data_width_label     = new Label(this, "", "sans-bold");
+        m_scroll_offset_label  = new Label(this, "", "sans-bold");
 
         {
             Widget *start_row = new Widget(this);
             start_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
             m_start_dec = new Button(start_row, "-");
-            m_start_label = new Label(start_row, "start: --", "sans-bold");
+            m_start_label = new Label(start_row, "", "sans-bold");
             m_start_label->set_fixed_width(100);
             m_start_inc = new Button(start_row, "+");
-            m_start_dec->set_callback([this] { m_cpu_graph->nudge_start(-1.0); });
-            m_start_inc->set_callback([this] { m_cpu_graph->nudge_start(1.0); });
+            m_start_dec->set_callback([this] { m_graph->nudge_start(-1.0); });
+            m_start_inc->set_callback([this] { m_graph->nudge_start(1.0); });
         }
 
         {
             Widget *end_row = new Widget(this);
             end_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
             m_end_dec = new Button(end_row, "-");
-            m_end_label = new Label(end_row, "end: --", "sans-bold");
+            m_end_label = new Label(end_row, "", "sans-bold");
             m_end_label->set_fixed_width(100);
             m_end_inc = new Button(end_row, "+");
-            m_end_dec->set_callback([this] { m_cpu_graph->nudge_end(-1.0); });
-            m_end_inc->set_callback([this] { m_cpu_graph->nudge_end(1.0); });
+            m_end_dec->set_callback([this] { m_graph->nudge_end(-1.0); });
+            m_end_inc->set_callback([this] { m_graph->nudge_end(1.0); });
         }
 
-        // Pause button row
+        // Pause button
         Widget *pause_row = new Widget(this);
         pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
         Button *pause_button = new Button(pause_row, "Pause");
         pause_button->set_flags(Button::ToggleButton);
         pause_button->set_pushed(false);
         pause_button->set_change_callback([this, pause_button](bool pushed) {
-            m_cpu_graph->set_paused(pushed);
+            m_graph->set_paused(pushed);
             pause_button->set_caption(pushed ? "Resume" : "Pause");
         });
 
-        m_coord_label = new Label(this, "Graph mouse coords: (x, y)", "sans-bold");
-
         VScrollPanel *panel = new VScrollPanel(this);
         panel->set_fixed_height(100);
-
-        // Container inside scroll panel (this is where items go)
         Widget *content = new Widget(panel);
         content->set_layout(new GroupLayout());
-        //
-
         for (int i = 0; i < 10; ++i) {
             new Label(content, "Label " + std::to_string(i), "sans-bold");
         }
 
         perform_layout();
 
-        /* All NanoGUI widgets are initialized at this point. Now
-           create shaders to draw the main window contents.
-
-           NanoGUI comes with a simple wrapper around GLES/Metal/OpenGL 3,
-           which eliminates most of the tedious and error-prone shader and
-           buffer object management.
-        */
-
+        // ---- render pass + shader ----
         m_render_pass = new RenderPass({ this });
         m_render_pass->set_clear_color(0, Color(0.3f, 0.3f, 0.32f, 1.f));
 
-        m_shader = new Shader(
-            m_render_pass,
-            "a_simple_shader",
-            simple_vert,
-            simple_frag
-        );
+        m_shader = new Shader(m_render_pass, "a_simple_shader", simple_vert, simple_frag);
 
-        const uint32_t indices[3*2] = {
-            0, 1, 2,
-            2, 3, 0
-        };
-
+        const uint32_t indices[3*2] = { 0, 1, 2, 2, 3, 0 };
         const float positions[3*4] = {
             -1.f, -1.f, 0.f,
-            1.f, -1.f, 0.f,
-            1.f, 1.f, 0.f,
-            -1.f, 1.f, 0.f
+             1.f, -1.f, 0.f,
+             1.f,  1.f, 0.f,
+            -1.f,  1.f, 0.f
         };
-
         m_shader->set_buffer("indices", VariableType::UInt32, {3*2}, indices);
         m_shader->set_buffer("position", VariableType::Float32, {4, 3}, positions);
         m_shader->set_uniform("intensity", .5f);
     }
 
-    // Enable components to be resized
+    void switch_source(DataSource *source) {
+        m_graph->set_data_source(source);
+    }
+
     bool resize_event(const Vector2i &size) override {
         perform_layout();
         return Screen::resize_event(size);
@@ -156,29 +142,35 @@ public:
     }
 
     void draw(NVGcontext *ctx) override {
-        // Update stats labels from CpuGraph (always, even when paused)
-        if (m_cpu_graph && m_total_samples_label) {
+        if (m_graph) {
+            const auto &s = m_graph->stats();
             std::ostringstream oss;
-            const auto &s = m_cpu_graph->stats(0);
-            oss.str(""); oss << "total_samples: " << s.total_samples;
+
+            oss << "total_samples: " << s.total_samples;
             m_total_samples_label->set_caption(oss.str());
+
             oss.str(""); oss << "excess_samples: " << s.excess_samples;
-            m_visible_count_label->set_caption(oss.str());
+            m_excess_samples_label->set_caption(oss.str());
+
             oss.str(""); oss << "step: " << s.step;
             m_step_label->set_caption(oss.str());
+
             oss.str(""); oss << "vertex count: " << s.vertex_count;
-            m_count_label->set_caption(oss.str());
+            m_vertex_count_label->set_caption(oss.str());
+
             oss.str(""); oss << "data_width: " << s.data_width;
             m_data_width_label->set_caption(oss.str());
+
             oss.str(""); oss << "start: " << s.start;
             m_start_label->set_caption(oss.str());
+
             oss.str(""); oss << "end: " << s.end;
             m_end_label->set_caption(oss.str());
+
             oss.str(""); oss << "scroll_offset: " << s.scroll_offset;
             m_scroll_offset_label->set_caption(oss.str());
         }
 
-        /* Draw the user interface */
         Screen::draw(ctx);
     }
 
@@ -200,25 +192,31 @@ public:
 
         if (m_frame_index % 60 == 59) {
             char caption[128];
-            snprintf(caption, 128, "NanoGUI test (%.2f FPS)", 1.f / m_frame_timer.value());
+            snprintf(caption, 128, "NanoMON (%.2f FPS)", 1.f / m_frame_timer.value());
             set_caption(caption);
         }
     }
+
 private:
-    Label *m_coord_label;
-    MultiCpuGraph *m_cpu_graph = nullptr;
-    Label *m_total_samples_label = nullptr;
-    Label *m_visible_count_label = nullptr;
-    Label *m_step_label = nullptr;
-    Label *m_count_label = nullptr;
-    Label *m_data_width_label = nullptr;
+    std::unique_ptr<CpuDataSource>    m_cpu_source;
+    std::unique_ptr<MemoryDataSource> m_mem_source;
+    std::unique_ptr<DiskDataSource>   m_disk_source;
+
+    Graph *m_graph = nullptr;
+
+    Label *m_total_samples_label  = nullptr;
+    Label *m_excess_samples_label = nullptr;
+    Label *m_step_label           = nullptr;
+    Label *m_vertex_count_label    = nullptr;
+    Label *m_data_width_label     = nullptr;
+    Label *m_scroll_offset_label  = nullptr;
     Label *m_start_label = nullptr;
-    Label *m_end_label = nullptr;
-    Label *m_scroll_offset_label = nullptr;
-    Button *m_start_dec = nullptr;
-    Button *m_start_inc = nullptr;
-    Button *m_end_dec = nullptr;
-    Button *m_end_inc = nullptr;
+    Label *m_end_label   = nullptr;
+    Button *m_start_dec  = nullptr;
+    Button *m_start_inc  = nullptr;
+    Button *m_end_dec    = nullptr;
+    Button *m_end_inc    = nullptr;
+
     ref<Shader> m_shader;
     ref<RenderPass> m_render_pass;
 };
@@ -227,7 +225,7 @@ int main(int /* argc */, char ** /* argv */) {
     try {
         nanogui::init();
 
-        /* scoped variables */ {
+        {
             ref<ExampleApplication> app = new ExampleApplication();
             app->dec_ref();
             app->set_visible(true);
@@ -236,8 +234,7 @@ int main(int /* argc */, char ** /* argv */) {
 
         nanogui::shutdown();
     } catch (const std::exception &e) {
-        std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
-        std::cerr << error_msg << std::endl;
+        std::cerr << "Caught a fatal error: " << e.what() << std::endl;
         return -1;
     } catch (...) {
         std::cerr << "Caught an unknown error!" << std::endl;
