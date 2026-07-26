@@ -53,6 +53,7 @@ add_executable(nanomon
         src/VertexGenerator.cpp
         src/MemoryDataSource.cpp
         src/DiskDataSource.cpp
+        src/StatsWidget.cpp
 )
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)

@@ -2,10 +2,10 @@
 
 #include <memory>
 #include <nanogui/canvas.h>
-#include <nanogui/window.h>
 #include <nanogui/shader.h>
 
 #include "DataSource.h"
+#include "StatsWidget.h"
 #include "VertexGenerator.h"
 #include "ViewWindow.h"
 
@@ -13,7 +13,7 @@ using namespace nanogui;
 
 class Graph : public Canvas {
 public:
-    Graph(Widget *parent, std::unique_ptr<DataSource> data_source);
+    Graph(Widget *parent, std::unique_ptr<DataSource> data_source, StatsWidget *stats_widget);
 
     void perform_layout(NVGcontext *ctx) override;
     void draw(NVGcontext *ctx) override;
@@ -48,6 +48,7 @@ protected:
     std::unique_ptr<DataSource> m_data_source;
     ViewWindow m_view_window{MAX_VERTICES};
     std::vector<VertexGenerator> m_vertex_generators;
+    ref<StatsWidget> m_stats_widget;
 
     static const Vector3f GRID_COLOUR;
 

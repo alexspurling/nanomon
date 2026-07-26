@@ -58,6 +58,7 @@ int ViewWindow::calculate_step() const {
 
 void ViewWindow::add_sample() {
     const int step = calculate_step();
+    m_graph_stats.step = step;
 
     // Increment every time we get step samples plus one extra. We need the extra sample to produce a line-segment.
     // For example, if step == 2, then 5 samples are needed to generate 2 line-segments and 7 samples to generate 3 line-segments.

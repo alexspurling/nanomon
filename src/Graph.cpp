@@ -2,15 +2,12 @@
 
 #include <nanogui/renderpass.h>
 #include <nanogui/button.h>
-#include <nanogui/label.h>
 #include <nanogui/layout.h>
 #include <nanogui/screen.h>
-#include <sstream>
-#include <iostream>
 
 #include "nanogui/popup.h"
 
-using nanogui::Vector3f;
+using namespace nanogui;
 
 const Vector3f Graph::GRID_COLOUR = {0.05f, 0.15f, 0.05f};
 
@@ -34,10 +31,8 @@ void main() {
 //  Graph
 // ============================================================
 
-Graph::Graph(Widget *parent, std::unique_ptr<DataSource> data_source)
-    : Canvas(parent, 1, true), m_data_source(std::move(data_source)) {
-
-    using namespace nanogui;
+Graph::Graph(Widget *parent, std::unique_ptr<DataSource> data_source, StatsWidget *stats_widget)
+    : Canvas(parent, 1, true), m_data_source(std::move(data_source)), m_stats_widget(stats_widget) {
 
     m_shader = new Shader(render_pass(), "graph_line_shader", VERT_SRC, FRAG_SRC);
     m_grid_shader = new Shader(render_pass(), "graph_grid_shader", VERT_SRC, FRAG_SRC);
@@ -100,19 +95,8 @@ void Graph::create_context_menu() {
     auto *debug_btn = new Button(popup_content, "Debug stats");
     debug_btn->set_callback([this] {
         m_context_menu->set_visible(false);
-
-        const auto graph_stats = stats();
-        std::ostringstream oss;
-        oss << "total_samples: "  << graph_stats.total_samples  << std::endl
-            << "excess_samples: " << graph_stats.excess_samples << std::endl
-            << "step: "           << graph_stats.step           << std::endl
-            << "vertex_count: "   << graph_stats.vertex_count   << std::endl
-            << "data_width: "     << graph_stats.data_width     << std::endl
-            << "start: "          << graph_stats.start          << std::endl
-            << "end: "            << graph_stats.end            << std::endl
-            << "scroll_offset: "  << graph_stats.scroll_offset  << std::endl;
-
-        std::cout << "=== Debug stats ===" << std::endl << oss.str();
+        m_stats_widget->set_graph(this);
+        m_stats_widget->set_visible(!m_stats_widget->visible());
     });
 }
 
@@ -232,6 +216,10 @@ void Graph::update() {
     if (!m_paused) {
         m_view_window.update_scroll(
             static_cast<double>(m_frame_count % m_sample_interval) / m_sample_interval);
+    }
+    if (visible()) {
+        m_stats_widget->set_stats(stats());
+        m_stats_widget->update_labels();
     }
     m_frame_count++;
 }
