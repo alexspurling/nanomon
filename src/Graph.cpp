@@ -1,6 +1,14 @@
 #include "Graph.h"
 
 #include <nanogui/renderpass.h>
+#include <nanogui/button.h>
+#include <nanogui/label.h>
+#include <nanogui/layout.h>
+#include <nanogui/screen.h>
+#include <sstream>
+#include <iostream>
+
+#include "nanogui/popup.h"
 
 using nanogui::Vector3f;
 
@@ -52,6 +60,8 @@ Graph::Graph(Widget *parent, std::unique_ptr<DataSource> data_source)
             cfg.y_min,
             cfg.y_max);
     }
+
+    create_context_menu();
 }
 
 // ---- layout ----
@@ -70,6 +80,42 @@ void Graph::draw(NVGcontext *ctx) {
 
 // ---- input ----
 
+void Graph::create_context_menu() {
+
+    m_context_menu = new Popup(screen(), window());
+    m_context_menu->set_size(Vector2i(200, 100));
+    m_context_menu->set_position(Vector2i(50, 50));
+    m_context_menu->set_visible(false);
+
+    auto *popup_content = new Widget(m_context_menu);
+    popup_content->set_layout(new GroupLayout());
+
+    auto *pause_btn = new Button(popup_content, "Pause");
+    pause_btn->set_callback([this, pause_btn] {
+        m_paused = !m_paused;
+        pause_btn->set_caption(m_paused ? "Resume" : "Pause");
+        m_context_menu->set_visible(false);
+    });
+
+    auto *debug_btn = new Button(popup_content, "Debug stats");
+    debug_btn->set_callback([this] {
+        m_context_menu->set_visible(false);
+
+        const auto graph_stats = stats();
+        std::ostringstream oss;
+        oss << "total_samples: "  << graph_stats.total_samples  << std::endl
+            << "excess_samples: " << graph_stats.excess_samples << std::endl
+            << "step: "           << graph_stats.step           << std::endl
+            << "vertex_count: "   << graph_stats.vertex_count   << std::endl
+            << "data_width: "     << graph_stats.data_width     << std::endl
+            << "start: "          << graph_stats.start          << std::endl
+            << "end: "            << graph_stats.end            << std::endl
+            << "scroll_offset: "  << graph_stats.scroll_offset  << std::endl;
+
+        std::cout << "=== Debug stats ===" << std::endl << oss.str();
+    });
+}
+
 bool Graph::mouse_button_event(const Vector2i &p, int button,
                                 bool down, int modifiers) {
     if (button == 0) {
@@ -77,11 +123,24 @@ bool Graph::mouse_button_event(const Vector2i &p, int button,
             m_dragging = true;
             m_was_paused_before_drag = m_paused;
             m_paused = true;
+
+            // Dismiss context menu on left-click
+            m_context_menu->set_visible(false);
         } else if (m_dragging) {
             m_dragging = false;
             m_paused = m_was_paused_before_drag;
         }
     }
+
+    // Right-click down → show context menu
+    if (button == 1 && down) {
+        Vector2i screen_pos = absolute_position() + p + Vector2i(18, -29);
+        m_context_menu->set_position(screen_pos);
+        m_context_menu->set_visible(true);
+        m_context_menu->perform_layout(screen()->nvg_context());
+        return true;
+    }
+
     return Canvas::mouse_button_event(p, button, down, modifiers);
 }
 

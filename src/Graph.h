@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <nanogui/canvas.h>
+#include <nanogui/window.h>
 #include <nanogui/shader.h>
 
 #include "DataSource.h"
@@ -32,6 +33,7 @@ public:
     bool scroll_event(const Vector2i &p, const Vector2f &rel) override;
 
     void update();
+    void create_context_menu();
 
 protected:
 
@@ -59,4 +61,5 @@ protected:
     static constexpr int MAX_VERTICES = 50;
     static constexpr int SAMPLE_FREQUENCY = 1;
     static constexpr int SAMPLE_WINDOW_SIZE = 2;
+    Popup *m_context_menu = nullptr;
 };

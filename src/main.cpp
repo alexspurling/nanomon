@@ -21,13 +21,17 @@ using namespace nanogui;
 
 class ExampleApplication : public Screen {
 public:
-    ExampleApplication() : Screen(Vector2i(1024, 768), "NanoMON") {
+    ExampleApplication() : Screen(Vector2i(1024, 768), "Nanomon") {
         inc_ref();
 
-        this->set_layout(new GroupLayout());
+        // Setting the GroupLayout on the Screen widget is necessary to get the main_container to fill the width of the screen
+        set_layout(new GroupLayout(0));
+        Widget *main_container = new Widget(this);
+        main_container->set_tooltip("Main container");
+        main_container->set_layout(new GroupLayout());
 
         // ---- tab bar ----
-        Widget *tab_group = new Widget(this);
+        Widget *tab_group = new Widget(main_container);
         tab_group->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
 
         Button *btn_cpu = new Button(tab_group, "CPU");
@@ -39,7 +43,7 @@ public:
         btn_disk->set_flags(Button::RadioButton);
 
         // ---- graphs ----
-        Widget *graph_container = new Widget(this);
+        Widget *graph_container = new Widget(main_container);
         graph_container->set_fixed_height(250);
 
         m_cpu_graph = new Graph(graph_container, std::make_unique<CpuDataSource>());
@@ -55,15 +59,15 @@ public:
         // ---- stats labels ----
         // It's important to set an initial caption because nanogui uses this to determine the size of the labels. If
         // we were to set the initial caption to "", then the initial width would be 0
-        m_total_samples_label  = new Label(this, "total_samples: --", "sans-bold");
-        m_excess_samples_label = new Label(this, "excess_samples: --", "sans-bold");
-        m_step_label           = new Label(this, "step: --", "sans-bold");
-        m_vertex_count_label   = new Label(this, "vertex_count: --", "sans-bold");
-        m_data_width_label     = new Label(this, "data_width: --", "sans-bold");
-        m_scroll_offset_label  = new Label(this, "scroll_offset: --", "sans-bold");
+        m_total_samples_label  = new Label(main_container, "total_samples: --", "sans-bold");
+        m_excess_samples_label = new Label(main_container, "excess_samples: --", "sans-bold");
+        m_step_label           = new Label(main_container, "step: --", "sans-bold");
+        m_vertex_count_label   = new Label(main_container, "vertex_count: --", "sans-bold");
+        m_data_width_label     = new Label(main_container, "data_width: --", "sans-bold");
+        m_scroll_offset_label  = new Label(main_container, "scroll_offset: --", "sans-bold");
 
         {
-            Widget *start_row = new Widget(this);
+            Widget *start_row = new Widget(main_container);
             start_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
             m_start_dec = new Button(start_row, "-");
             m_start_label = new Label(start_row, "start: --", "sans-bold");
@@ -78,7 +82,7 @@ public:
         }
 
         {
-            Widget *end_row = new Widget(this);
+            Widget *end_row = new Widget(main_container);
             end_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
             m_end_dec = new Button(end_row, "-");
             m_end_label = new Label(end_row, "end: --", "sans-bold");
@@ -89,7 +93,7 @@ public:
         }
 
         // Pause button
-        Widget *pause_row = new Widget(this);
+        Widget *pause_row = new Widget(main_container);
         pause_row->set_layout(new BoxLayout(Orientation::Horizontal, Alignment::Middle, 0, 6));
         Button *pause_button = new Button(pause_row, "Pause");
         pause_button->set_flags(Button::ToggleButton);
@@ -126,7 +130,7 @@ public:
             pause_button->set_caption(pause_button->pushed() ? "Resume" : "Pause");
         });
 
-        VScrollPanel *panel = new VScrollPanel(this);
+        VScrollPanel *panel = new VScrollPanel(main_container);
         panel->set_fixed_height(100);
         Widget *content = new Widget(panel);
         content->set_layout(new GroupLayout());
@@ -135,7 +139,6 @@ public:
         }
 
         perform_layout();
-
         // ---- render pass + shader ----
         m_render_pass = new RenderPass({ this });
         m_render_pass->set_clear_color(0, Color(0.3f, 0.3f, 0.32f, 1.f));
@@ -152,11 +155,6 @@ public:
         m_shader->set_buffer("indices", VariableType::UInt32, {3*2}, indices);
         m_shader->set_buffer("position", VariableType::Float32, {4, 3}, positions);
         m_shader->set_uniform("intensity", .5f);
-    }
-
-    bool resize_event(const Vector2i &size) override {
-        perform_layout();
-        return Screen::resize_event(size);
     }
 
     bool keyboard_event(int key, int scancode, int action, int modifiers) override {
