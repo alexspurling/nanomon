@@ -9,6 +9,8 @@ struct GraphStats {
     double start = 0.0;
     double end = 0.0;
     double scroll_offset = 0.0;
+    double auto_scroll_offset = 0.0;
+    double pan_offset = 0.0;
 };
 
 class ViewWindow {
@@ -36,7 +38,6 @@ public:
     void set_num_samples(int n) {
         m_num_samples = n;
         m_graph_stats.total_samples = m_num_samples;
-        m_graph_stats.excess_samples = m_num_samples - m_view_end;
     }
 
     [[nodiscard]] int calculate_step() const;

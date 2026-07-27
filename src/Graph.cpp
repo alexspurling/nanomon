@@ -134,7 +134,6 @@ bool Graph::mouse_drag_event(const Vector2i &p, const Vector2i &rel, const int b
         const double ndc_delta = -rel.x() * ndc_per_pixel;
         const double idx_delta = ndc_delta * m_view_window.view_width() / 2.0;
 
-        m_view_window.set_num_samples(m_data_source->num_samples());
         m_view_window.pan(idx_delta);
     }
     return Canvas::mouse_drag_event(p, rel, button, modifiers);
@@ -145,9 +144,7 @@ bool Graph::scroll_event(const Vector2i &p, const Vector2f &rel) {
     constexpr double zoom_factor = 1.1;
     const double factor = (rel.y() < 0) ? zoom_factor : 1.0 / zoom_factor;
 
-    m_view_window.set_num_samples(m_data_source->num_samples());
     m_view_window.zoom(factor, mouse_ratio);
-
     return Canvas::scroll_event(p, rel);
 }
 
@@ -204,7 +201,9 @@ void Graph::render_line_strip(Shader *shader, const std::vector<float> &verts, c
 void Graph::update() {
     // ---- 1. sample at fixed interval ----
     if (m_frame_count % m_sample_interval == 0) {
-        m_data_source->sample();
+        if (!m_paused) {
+            m_data_source->sample();
+        }
         const int n_samples = m_data_source->num_samples();
 
         m_view_window.set_num_samples(n_samples);

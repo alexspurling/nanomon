@@ -79,7 +79,7 @@ void ViewWindow::update_scroll(const double sample_progress) {
     // sample_progress is a number between 0 and 1 representing how far we are between two sample intervals
     // m_sample_scroll is a number between 0 and step representing how far we are between two step intervals.
     // Skipping this call freezes the auto-scroll; update_offset still applies pan movement.
-    const int step_progress = m_num_samples > 0 ? (m_num_samples - 1) % step : 0;
+    const int step_progress = (m_num_samples - 1) % step;
     m_sample_scroll = step_progress + sample_progress;
 
     update_offset();

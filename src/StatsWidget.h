@@ -25,6 +25,8 @@ private:
     Label *m_vertex_count_label    = nullptr;
     Label *m_data_width_label     = nullptr;
     Label *m_scroll_offset_label  = nullptr;
+    Label *m_auto_scroll_offset_label  = nullptr;
+    Label *m_pan_offset_label  = nullptr;
     Label *m_start_label = nullptr;
     Label *m_end_label   = nullptr;
     Button *m_start_dec  = nullptr;

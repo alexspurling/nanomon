@@ -35,7 +35,9 @@ StatsWidget::StatsWidget(Widget *parent) : Widget(parent) {
     Widget *col2 = new Widget(this);
     col2->set_layout(new GroupLayout(10, 0, 3, 0));
     m_data_width_label     = new Label(col2, "data_width: -----", "sans-bold");
-    m_scroll_offset_label  = new Label(col2, "scroll_offset: -----", "sans-bold");
+    m_scroll_offset_label  = new Label(col2, "scroll offset: -----", "sans-bold");
+    m_auto_scroll_offset_label  = new Label(col2, "auto scroll offset: -----", "sans-bold");
+    m_pan_offset_label  = new Label(col2, "pan offset: -----", "sans-bold");
 
     {
         Widget *start_row = new Widget(col2);
@@ -104,6 +106,12 @@ void StatsWidget::update_labels() const {
     oss.str(""); oss << "end: " << m_stats.end;
     m_end_label->set_caption(oss.str());
 
-    oss.str(""); oss << "scroll_offset: " << m_stats.scroll_offset;
+    oss.str(""); oss << "scroll offset: " << m_stats.scroll_offset;
     m_scroll_offset_label->set_caption(oss.str());
+
+    oss.str(""); oss << "auto scroll offset: " << m_stats.auto_scroll_offset;
+    m_auto_scroll_offset_label->set_caption(oss.str());
+
+    oss.str(""); oss << "pan offset: " << m_stats.pan_offset;
+    m_pan_offset_label->set_caption(oss.str());
 }
