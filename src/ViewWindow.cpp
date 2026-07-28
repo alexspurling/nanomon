@@ -1,6 +1,8 @@
 #include "ViewWindow.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <ostream>
 
 ViewWindow::ViewWindow(const int max_vertices)
     : m_max_vertices(max_vertices){}
@@ -28,10 +30,21 @@ void ViewWindow::zoom(const double factor, const double mouse_ratio) {
     update_offset();
 }
 
-void ViewWindow::set_view_window(const double view_start, const double view_end) {
+void ViewWindow::set_view_window(double view_start, double view_end) {
     // The view bounds are stored as integers; the fractional remainder of the
     // start position is kept in m_pan_offset (always in [0, 1)) and applied as
     // a sub-sample x offset by update_scroll.
+
+    const int step = calculate_step();
+    double max_view_end = num_samples() - step;
+    if (view_end > max_view_end) {
+        std::cout << "View end is: " << view_end << " max_view_end: " << max_view_end << " num_samples: " << num_samples() << std::endl;
+        double view_width = view_end - view_start;
+        view_end = max_view_end;
+        view_start = view_end - view_width;
+        std::cout << "New view end is: " << view_end << std::endl;
+    }
+
     const double start_floor = std::floor(view_start);
     m_view_start = static_cast<int>(start_floor);
     m_pan_offset = view_start - start_floor;
@@ -95,10 +108,20 @@ void ViewWindow::update_offset() {
     // integer view bounds and regenerate the vertices to match
     const int fold_steps = static_cast<int>(std::floor(scroll_offset / step));
     if (fold_steps != 0) {
+        const int prev_view_start = m_view_start;
+        const int prev_view_end = m_view_end;
+        const double prev_pan_offset = m_pan_offset;
+        const double prev_scroll_offset = scroll_offset;
         m_view_start += fold_steps * step;
         m_view_end   += fold_steps * step;
         m_pan_offset -= fold_steps * step;
         scroll_offset -= fold_steps * step;
+        std::cout << "view_start: " << prev_view_start << " -> " << m_view_start <<
+            ", m_view_end: " << prev_view_end << " -> " << m_view_end <<
+            ", m_pan_offset: " << prev_pan_offset << " -> " << m_pan_offset <<
+            ", scroll_offset: " << prev_scroll_offset << " -> " << scroll_offset <<
+            ", num_samples: " << prev_scroll_offset << " -> " << scroll_offset <<
+                std::endl;
     }
 
     const int data_width = view_width();
@@ -107,5 +130,8 @@ void ViewWindow::update_offset() {
     const double graph_screen_width = 2.0 * visible_count / (visible_count - 1);
     m_scroll_offset = scroll_offset * graph_screen_width / data_width;
 
-    m_graph_stats.scroll_offset = get_scroll_offset();
+    m_graph_stats.scroll_offset = scroll_offset;
+    m_graph_stats.auto_scroll_offset = m_sample_scroll;
+    m_graph_stats.pan_offset = m_pan_offset;
+    m_graph_stats.excess_samples = m_num_samples - m_view_end;
 }
