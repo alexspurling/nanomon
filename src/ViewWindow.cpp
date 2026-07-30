@@ -35,21 +35,37 @@ void ViewWindow::set_view_window(double view_start, double view_end) {
     // start position is kept in m_pan_offset (always in [0, 1)) and applied as
     // a sub-sample x offset by update_scroll.
 
-    const int step = calculate_step();
-    double max_view_end = num_samples() - step;
-    if (view_end > max_view_end) {
-        std::cout << "View end is: " << view_end << " max_view_end: " << max_view_end << " num_samples: " << num_samples() << std::endl;
-        double view_width = view_end - view_start;
-        view_end = max_view_end;
-        view_start = view_end - view_width;
-        std::cout << "New view end is: " << view_end << std::endl;
+    // The step depends on the width of the *new* window, not the one it replaces
+    const int width = std::max(1, static_cast<int>(std::lround(view_end - view_start)));
+    const int step = std::max(1, width / m_max_vertices);
+
+    // add_sample() advances the window by a whole step at a time, so the right
+    // edge has to sit on the step grid at or behind the newest sample. Any
+    // further right and the next advance carries the window past the live data.
+    const int max_view_end = std::max(0, num_samples() - 1) / step * step;
+
+    // The right edge actually lands at view_start + width, so test that rather
+    // than the requested view_end: rounding the width to a whole number of
+    // samples can otherwise nudge the edge past the cap.
+    if (view_start + width > max_view_end) {
+        // Snap flush to the live edge. The sub-sample position is then supplied
+        // entirely by the auto-scroll, so the pan offset is spent.
+        m_view_end = max_view_end;
+        m_view_start = max_view_end - width;
+        m_pan_offset = 0.0;
+    } else {
+        const double start_floor = std::floor(view_start);
+        m_view_start = static_cast<int>(start_floor);
+        m_pan_offset = view_start - start_floor;
+        // Preserve the requested width rather than flooring both ends independently
+        m_view_end = m_view_start + width;
     }
 
-    const double start_floor = std::floor(view_start);
-    m_view_start = static_cast<int>(start_floor);
-    m_pan_offset = view_start - start_floor;
-    // Preserve the requested width rather than flooring both ends independently
-    m_view_end = m_view_start + static_cast<int>(std::lround(view_end - view_start));
+    // m_sample_scroll is expressed in units of the old step; re-derive it for the
+    // new one so that it stays inside [0, step) and update_offset() does not fold
+    // a phantom step into the view bounds.
+    const double sample_progress = m_sample_scroll - std::floor(m_sample_scroll);
+    m_sample_scroll = std::max(0, num_samples() - 1) % step + sample_progress;
 
     m_graph_stats.step = calculate_step();
     m_graph_stats.data_width = view_width();
@@ -116,12 +132,12 @@ void ViewWindow::update_offset() {
         m_view_end   += fold_steps * step;
         m_pan_offset -= fold_steps * step;
         scroll_offset -= fold_steps * step;
-        std::cout << "view_start: " << prev_view_start << " -> " << m_view_start <<
-            ", m_view_end: " << prev_view_end << " -> " << m_view_end <<
-            ", m_pan_offset: " << prev_pan_offset << " -> " << m_pan_offset <<
-            ", scroll_offset: " << prev_scroll_offset << " -> " << scroll_offset <<
-            ", num_samples: " << prev_scroll_offset << " -> " << scroll_offset <<
-                std::endl;
+        // std::cout << "view_start: " << prev_view_start << " -> " << m_view_start <<
+        //    ", m_view_end: " << prev_view_end << " -> " << m_view_end <<
+        //    ", m_pan_offset: " << prev_pan_offset << " -> " << m_pan_offset <<
+        //    ", scroll_offset: " << prev_scroll_offset << " -> " << scroll_offset <<
+        //    ", num_samples: " << prev_scroll_offset << " -> " << scroll_offset <<
+        //        std::endl;
     }
 
     const int data_width = view_width();

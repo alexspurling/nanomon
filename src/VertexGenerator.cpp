@@ -26,7 +26,15 @@ std::vector<float> VertexGenerator::generate_vertices(
 
     // Snap the sample indices to a multiple of the step
     const int first_idx = std::max(window.view_start() / step * step, sample_window_size);
-    const int last_idx = std::min(window.view_end() / step * step, num_samples - 1);
+
+    // Round the last index UP to a multiple of step so the rightmost vertex
+    // covers view_end. Snapping down leaves it short of the edge when view_end is
+    // off-grid, and the scroll offset (which spans a full step) then pulls the
+    // final point left of x = 1.0. Bounded by the newest sample we actually have.
+    int last_idx = window.view_end() / step * step;
+    if (last_idx < window.view_end())
+        last_idx += step;
+    last_idx = std::min(last_idx, num_samples - 1);
 
     std::vector<float> vertices;
 
