@@ -54,6 +54,7 @@ add_executable(nanomon
         src/MemoryDataSource.cpp
         src/DiskDataSource.cpp
         src/StatsWidget.cpp
+        src/ViewWindowRecorder.cpp
 )
 
 embed_shader(nanomon shaders/simple_vert.glsl simple_vert)
@@ -70,3 +71,39 @@ target_include_directories(nanomon PRIVATE
 
 target_compile_options(nanomon PRIVATE -fsanitize=undefined)
 target_link_options(nanomon PRIVATE -fsanitize=undefined)
+
+# Replays a recording written by ViewWindow's bounds trip-wire. Needs no GUI, so
+# it builds against ViewWindow alone.
+add_executable(viewwindow_replay
+        src/replay_main.cpp
+        src/ViewWindow.cpp
+        src/ViewWindowRecorder.cpp
+)
+target_compile_options(viewwindow_replay PRIVATE -fsanitize=undefined)
+target_link_options(viewwindow_replay PRIVATE -fsanitize=undefined)
+
+target_include_directories(viewwindow_replay PRIVATE src)
+
+# ---- tests ----
+enable_testing()
+
+# Self-contained property test for the bounds invariant. No GUI, no fixtures.
+add_executable(viewwindow_invariant_test
+        test/viewwindow_invariant_test.cpp
+        src/ViewWindow.cpp
+        src/ViewWindowRecorder.cpp
+)
+target_include_directories(viewwindow_invariant_test PRIVATE src)
+target_compile_options(viewwindow_invariant_test PRIVATE -fsanitize=undefined)
+target_link_options(viewwindow_invariant_test PRIVATE -fsanitize=undefined)
+add_test(NAME viewwindow_invariant COMMAND viewwindow_invariant_test)
+
+# Turns a recorded session into a regression test: drop a recording written by
+# the app's bounds trip-wire into test/fixtures/ and it must replay without ever
+# running the window past the newest sample. Each fixture is one test case.
+file(GLOB VIEWWINDOW_RECORDINGS ${CMAKE_SOURCE_DIR}/test/fixtures/*.txt)
+foreach(recording ${VIEWWINDOW_RECORDINGS})
+    get_filename_component(recording_name ${recording} NAME_WE)
+    add_test(NAME replay_${recording_name}
+             COMMAND viewwindow_replay ${recording})
+endforeach()

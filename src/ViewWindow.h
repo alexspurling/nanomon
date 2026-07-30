@@ -1,5 +1,9 @@
 #pragma once
 
+#include <string>
+
+#include "ViewWindowRecorder.h"
+
 struct GraphStats {
     int total_samples = 0;
     int excess_samples = 0;
@@ -35,10 +39,7 @@ public:
     [[nodiscard]] int view_width() const { return m_view_end - m_view_start; }
     [[nodiscard]] int num_samples() const { return m_num_samples; }
 
-    void set_num_samples(int n) {
-        m_num_samples = n;
-        m_graph_stats.total_samples = m_num_samples;
-    }
+    void set_num_samples(int n);
 
     [[nodiscard]] int calculate_step() const;
 
@@ -54,11 +55,72 @@ public:
         return m_graph_stats;
     }
 
+    // ---- recording ----
+
+    /** Every output of this window, as written to a recording. */
+    [[nodiscard]] ViewWindowState state() const;
+
+    [[nodiscard]] const ViewWindowRecorder& recorder() const { return m_recorder; }
+
+    /** Write the recorded inputs to @p path. Returns false if the file cannot be written. */
+    [[nodiscard]] bool save_recording(const std::string& path) const { return m_recorder.save(path); }
+
+    /**
+     * When enabled (the default), moving the window past the newest sample saves
+     * the recording and exits the process. A replay turns this off so that it can
+     * carry on past the violation and report it itself.
+     */
+    void set_export_on_violation(const bool enabled) { m_export_on_violation = enabled; }
+
+    /**
+     * Turns input recording on or off (on by default). The recording grows for
+     * the life of the window, so tests that drive millions of inputs and never
+     * need to save turn it off.
+     */
+    void set_recording_enabled(const bool enabled) { m_recording_enabled = enabled; }
+
     // Set private for now to allow us to track number of vertices
     GraphStats m_graph_stats;
 
 private:
     void update_offset();
+
+    /**
+     * Saves the recording and terminates the process. Called when the window has
+     * moved somewhere it should not be able to reach, so that the inputs leading
+     * up to it can be replayed by the viewwindow_replay target.
+     */
+    [[noreturn]] void export_recording_and_exit(const char* reason);
+
+    /**
+     * Adds one event to the recording per public call: the input on the way in,
+     * the resulting state on the way out. Nested calls (pan() calling
+     * set_view_window()) are left out so that a replay applies each input exactly
+     * once. Recording the input up front means that a call which exits the
+     * process still leaves behind the input that broke things.
+     */
+    class RecordScope {
+    public:
+        RecordScope(ViewWindow& window, ViewWindowOp op, double arg0 = 0.0, double arg1 = 0.0)
+            : m_window(window) {
+            if (m_window.m_recording_enabled && m_window.m_record_depth++ == 0)
+                m_window.m_recorder.record(op, arg0, arg1, m_window.state());
+        }
+        ~RecordScope() {
+            if (m_window.m_recording_enabled && --m_window.m_record_depth == 0)
+                m_window.m_recorder.update_last_state(m_window.state());
+        }
+        RecordScope(const RecordScope&) = delete;
+        RecordScope& operator=(const RecordScope&) = delete;
+
+    private:
+        ViewWindow& m_window;
+    };
+
+    ViewWindowRecorder m_recorder;
+    int m_record_depth = 0;
+    bool m_recording_enabled = true;
+    bool m_export_on_violation = true;
 
     int m_max_vertices;
     int m_num_samples = 0;

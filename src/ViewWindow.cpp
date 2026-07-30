@@ -1,13 +1,24 @@
 #include "ViewWindow.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 #include <ostream>
 
+namespace {
+// Written next to the working directory of the running app
+constexpr const char *RECORDING_PATH = "viewwindow-recording.txt";
+}
+
 ViewWindow::ViewWindow(const int max_vertices)
-    : m_max_vertices(max_vertices){}
+    : m_max_vertices(max_vertices) {
+    // The window width is the only construction input a replay needs
+    const RecordScope scope(*this, ViewWindowOp::Construct, max_vertices);
+}
 
 void ViewWindow::pan(const double delta_idx) {
+    const RecordScope scope(*this, ViewWindowOp::Pan, delta_idx);
+
     // Pan relative to the true fractional position so sub-sample deltas accumulate
     const double view_start = m_view_start + m_pan_offset;
     const double view_end = m_view_end + m_pan_offset;
@@ -16,6 +27,8 @@ void ViewWindow::pan(const double delta_idx) {
 }
 
 void ViewWindow::zoom(const double factor, const double mouse_ratio) {
+    const RecordScope scope(*this, ViewWindowOp::Zoom, factor, mouse_ratio);
+
     const double width = view_width();
     const double new_width = width * factor;
     if (width <= 2 && factor < 1.0) {
@@ -31,6 +44,8 @@ void ViewWindow::zoom(const double factor, const double mouse_ratio) {
 }
 
 void ViewWindow::set_view_window(double view_start, double view_end) {
+    const RecordScope scope(*this, ViewWindowOp::SetViewWindow, view_start, view_end);
+
     // The view bounds are stored as integers; the fractional remainder of the
     // start position is kept in m_pan_offset (always in [0, 1)) and applied as
     // a sub-sample x offset by update_scroll.
@@ -74,11 +89,19 @@ void ViewWindow::set_view_window(double view_start, double view_end) {
 }
 
 void ViewWindow::set_view_start(const int start) {
+    const RecordScope scope(*this, ViewWindowOp::SetViewStart, start);
     m_view_start = start;
 }
 
 void ViewWindow::set_view_end(const int end) {
+    const RecordScope scope(*this, ViewWindowOp::SetViewEnd, end);
     m_view_end = end;
+}
+
+void ViewWindow::set_num_samples(const int n) {
+    const RecordScope scope(*this, ViewWindowOp::SetNumSamples, n);
+    m_num_samples = n;
+    m_graph_stats.total_samples = m_num_samples;
 }
 
 int ViewWindow::calculate_step() const {
@@ -86,6 +109,8 @@ int ViewWindow::calculate_step() const {
 }
 
 void ViewWindow::add_sample() {
+    const RecordScope scope(*this, ViewWindowOp::AddSample);
+
     const int step = calculate_step();
     m_graph_stats.step = step;
 
@@ -103,6 +128,8 @@ void ViewWindow::add_sample() {
 }
 
 void ViewWindow::update_scroll(const double sample_progress) {
+    const RecordScope scope(*this, ViewWindowOp::UpdateScroll, sample_progress);
+
     const int step = calculate_step();
 
     // sample_progress is a number between 0 and 1 representing how far we are between two sample intervals
@@ -150,4 +177,42 @@ void ViewWindow::update_offset() {
     m_graph_stats.auto_scroll_offset = m_sample_scroll;
     m_graph_stats.pan_offset = m_pan_offset;
     m_graph_stats.excess_samples = m_num_samples - m_view_end;
+
+    // The window is only ever allowed to reach the newest sample, never past it,
+    // so anything at or below zero means a pan/zoom has escaped its bounds
+    if (m_export_on_violation && m_graph_stats.excess_samples <= 0) {
+        export_recording_and_exit("excess_samples <= 0");
+    }
+}
+
+ViewWindowState ViewWindow::state() const {
+    ViewWindowState s;
+    s.view_start = m_view_start;
+    s.view_end = m_view_end;
+    s.num_samples = m_num_samples;
+    s.pan_offset = m_pan_offset;
+    s.sample_scroll = m_sample_scroll;
+    s.scroll_offset = m_scroll_offset;
+    s.stats_scroll_offset = m_graph_stats.scroll_offset;
+    s.excess_samples = m_graph_stats.excess_samples;
+    s.step = m_graph_stats.step;
+    s.data_width = m_graph_stats.data_width;
+    return s;
+}
+
+void ViewWindow::export_recording_and_exit(const char *reason) {
+    // We are inside the failing call, so its event is already the last one in the
+    // recording; fill in the state it reached before writing the file
+    m_recorder.update_last_state(state());
+    const bool saved = m_recorder.save(RECORDING_PATH);
+
+    std::cerr << "ViewWindow bounds violated (" << reason << "): "
+              << "view_start=" << m_view_start << " view_end=" << m_view_end
+              << " num_samples=" << m_num_samples << " step=" << calculate_step()
+              << " pan_offset=" << m_pan_offset << " sample_scroll=" << m_sample_scroll << "\n"
+              << (saved ? "Wrote " : "FAILED to write ") << RECORDING_PATH
+              << " (" << m_recorder.size() << " events). Replay it with:\n"
+              << "  ./viewwindow_replay " << RECORDING_PATH << std::endl;
+
+    std::exit(EXIT_FAILURE);
 }
