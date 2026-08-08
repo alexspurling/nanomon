@@ -44,14 +44,26 @@ void ViewWindow::set_view_window(double view_start, double view_end) {
     // further right and the next advance carries the window past the live data.
     const int max_view_end = std::max(0, num_samples() - 1) / step * step;
 
-    // The right edge actually lands at view_start + width, so test that rather
-    // than the requested view_end: rounding the width to a whole number of
-    // samples can otherwise nudge the edge past the cap.
-    if (view_start + width > max_view_end) {
-        // Snap flush to the live edge. The sub-sample position is then supplied
-        // entirely by the auto-scroll, so the pan offset is spent.
+    // The integer left edge is confined to [lo, hi]:
+    //   hi = max_view_end - width : flush against the newest sample (right cap)
+    //   lo = min(0, hi)           : flush against the first sample, so the view
+    //                               cannot scroll left past sample 0 into a gap.
+    // When the window is wider than the available data the two caps meet
+    // (lo == hi) and the window locks to the right with the gap on the left.
+    const int hi = max_view_end - width;
+    const int lo = std::min(0, hi);
+
+    if (view_start > hi) {
+        // Clamped right: snap flush to the live edge. The sub-sample position is
+        // then supplied entirely by the auto-scroll, so the pan offset is spent.
+        m_view_start = hi;
         m_view_end = max_view_end;
-        m_view_start = max_view_end - width;
+        m_pan_offset = 0.0;
+    } else if (view_start < lo) {
+        // Clamped left: pin the left edge to the first sample. A gap may remain
+        // to its left but the view cannot scroll further into it.
+        m_view_start = lo;
+        m_view_end = lo + width;
         m_pan_offset = 0.0;
     } else {
         const double start_floor = std::floor(view_start);
